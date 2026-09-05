@@ -1,36 +1,140 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Care Episode Agent
 
-## Getting Started
+Frontend for a patient-facing Care Episode workflow built in Next.js.
 
-First, run the development server:
+The app lets a patient upload a prescription, track the episode through lab discovery and report analysis, and read agent-generated findings in plain language. The UI is built against a frozen API contract and can run fully in mock mode until the backend is ready.
+
+## What the app includes
+
+- `welcome` landing page for the Care Episode product
+- patient dashboard with:
+  - upload prescription
+  - upload history
+  - continue active episode
+  - needs attention
+  - recent conversations
+- episode detail page with timeline-driven care state UI
+- report upload flow with file upload and camera capture
+- mock episode engine for local development and demos
+
+## Tech stack
+
+- Next.js 15
+- React 19
+- TypeScript
+- Framer Motion
+- Lucide React
+
+## Getting started
 
 ```bash
+cd client
+npm install
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+If `next dev` starts failing after a production build, clear the build cache and restart:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+rm -rf .next
+npm run dev
+```
 
-## Learn More
+## Environment variables
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_USE_MOCKS` | `true` | Uses the in-memory/mock Care Episode API |
+| `NEXT_PUBLIC_API_BASE_URL` | empty | Backend base URL when mocks are disabled |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Main routes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Path | Purpose |
+| --- | --- |
+| `/` | Care Episode landing page |
+| `/welcome` | Redirects to `/` |
+| `/dashboard` | Main patient dashboard |
+| `/dashboard/episode?id=...` | Episode detail page |
+| `/episode?id=...` | Redirect helper to dashboard episode route |
+| `/settings` | Account/settings screen |
 
-## Deploy on Vercel
+Legacy MedLifeSim screens are still present in the codebase for future use and internal access, but the primary product flow is now the Care Episode experience.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Care Episode flow
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The UI is built around the episode lifecycle defined in [`api-contract.md`](./api-contract.md).
+
+Primary states currently handled in the frontend:
+
+- `PRESCRIPTION_RECEIVED`
+- `TESTS_IDENTIFIED`
+- `LABS_SHORTLISTED`
+- `BOOKING_REQUESTED`
+- `AWAITING_REPORT`
+- `REPORT_RECEIVED`
+- `TRENDS_ANALYZED`
+- `ANOMALY_FOUND`
+- `CONSULT_REQUESTED`
+- `NORMAL`
+- `CLOSED`
+- `NEEDS_HUMAN`
+
+## Mock mode
+
+Mock mode is enabled by default through `NEXT_PUBLIC_USE_MOCKS=true`.
+
+It includes:
+
+- seeded demo episodes
+- mock JSON payloads in `public/mocks/`
+- dashboard upload flow without a live backend
+- auto-cycling state progression on the episode page
+
+Demo patient:
+
+- `demo-patient-01`
+
+Sample preloaded episode:
+
+- `ep_7f3a9c`
+
+## Important files
+
+| Path | Purpose |
+| --- | --- |
+| `api-contract.md` | Frozen Care Episode API contract |
+| `src/care/types.ts` | Frontend Care Episode types |
+| `src/care/api.ts` | Care API client and mock/live switching |
+| `src/care/pages/CareDashboardPage.tsx` | Main dashboard UI |
+| `src/care/pages/CareEpisodePage.tsx` | Episode detail UI |
+| `src/care/components/PrescriptionUpload.tsx` | Prescription upload component |
+| `src/care/components/UploadHistorySection.tsx` | Dashboard upload history section |
+| `src/care/components/CameraCaptureModal.tsx` | Camera capture flow |
+| `public/mocks/` | Mock API payloads |
+
+## Build and deploy
+
+### Production build
+
+```bash
+npm run build
+```
+
+Production builds are configured for static export, so the generated site is written to `out/`.
+
+### Firebase Hosting
+
+```bash
+firebase deploy --only hosting
+```
+
+Firebase settings live in `firebase.json`.
+
+## Notes
+
+- `next.config.ts` only enables `output: 'export'` in production so local development keeps working.
+- The app is currently optimized for the Care Episode product, not the older MedLifeSim navigation.
+- The API contract is considered frozen unless both frontend and backend agree on a change.

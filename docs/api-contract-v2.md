@@ -36,7 +36,9 @@ Keep `NEXT_PUBLIC_USE_MOCKS=true` until the AWS backend is live.
 
 ---
 
-## 3. Endpoints — unchanged
+## 3. Endpoints
+
+Unchanged from v1, except the new `confirm` endpoint (section 4).
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -44,13 +46,124 @@ Keep `NEXT_PUBLIC_USE_MOCKS=true` until the AWS backend is live.
 | `GET` | `/api/episodes?patient_id=` | List episodes for a profile |
 | `POST` | `/api/episodes` | Upload prescription (`file` + `patient_id`) |
 | `GET` | `/api/episodes/{id}` | Full episode object (poll while active) |
+| `POST` | `/api/episodes/{id}/confirm` | **NEW** — confirm or correct the extracted tests |
 | `POST` | `/api/episodes/{id}/report` | Upload lab report (fallback path) |
 | `POST` | `/api/episodes/{id}/retry` | Retry after `NEEDS_HUMAN` |
 | `POST` | `/api/tick` | Internal — EventBridge Scheduler only |
 
 ---
 
-## 4. Coverage extension (OPTIONAL — build only if ahead of schedule)
+## 4. Extraction confirmation step (NEW — build this, it is core scope)
+
+This is a real addition to the state machine, not a stretch goal. **Neeraj should build this.**
+
+### Why it exists
+
+Handwriting extraction is good but not perfect. On real prescriptions the agent reads the
+test list reliably, but misreads dates and vitals. It must not spend the patient's money on
+the strength of its own unverified read of a doctor's handwriting.
+
+So: the agent extracts, shows the patient what it read, and **waits for confirmation before
+booking anything.** This is the soft counterpart to `NEEDS_HUMAN` — proceed, but verify first.
+
+### 4.1 New state
+
+```
+PRESCRIPTION_RECEIVED → TESTS_IDENTIFIED → AWAITING_CONFIRMATION → LABS_SHORTLISTED → …
+```
+
+UI label for `AWAITING_CONFIRMATION`: **"Confirm what we read"**
+
+This is a **terminal-until-acted-on** state. Stop polling. Nothing else happens until the
+patient confirms or corrects.
+
+### 4.2 New endpoint
+
+#### `POST /api/episodes/{episode_id}/confirm`
+
+Request:
+```json
+{
+  "tests": [
+    { "test_code": "CBC", "display_name": "Hb% TC DC ESR", "urgency": "routine", "keep": true },
+    { "test_code": "FBS", "display_name": "Sugar (F)", "urgency": "routine", "keep": true },
+    { "test_code": "VITD", "display_name": "25 OH D", "urgency": "routine", "keep": false },
+    { "test_code": "FT4TSH", "display_name": "FT4, TSH", "urgency": "urgent", "keep": true }
+  ]
+}
+```
+
+Response `200`: the episode object, state advanced to `LABS_SHORTLISTED`.
+
+Send back the full list with `keep` flags rather than only the kept ones — it lets the backend
+record what the patient rejected, which is useful signal.
+
+The patient may also edit `display_name` and toggle `urgency`. Both are optional; if
+unchanged, send them back as received.
+
+### 4.3 New field on the Episode object
+
+```json
+"confirmation": {
+  "required": true,
+  "confirmed_at": null,
+  "extracted_tests": [
+    { "test_code": "CBC", "display_name": "Hb% TC DC ESR", "urgency": "routine" }
+  ],
+  "confirmed_tests": null,
+  "edits_made": null
+}
+```
+
+After confirmation, `confirmed_at` is set, `confirmed_tests` holds the final list, and
+`edits_made` is an integer count of changes the patient made.
+
+`confirmation` is null in states before `TESTS_IDENTIFIED`.
+
+### 4.4 UI requirements
+
+The confirmation screen shows:
+
+- **The test list, each row editable and removable.** This is the important part — tests drive
+  every downstream step.
+- **The prescription image alongside it**, so the patient can check against the original.
+  Without this the confirmation is meaningless.
+- An urgency toggle per test (urgent / routine)
+- A clear primary action: **"Confirm and find labs"**
+- A secondary action: **"I need to re-upload"** → returns to upload
+
+**Do NOT display these fields, even though the API returns them:**
+- `date` — the model misreads DD.MM.YY dates and asserts them confidently. Use the upload
+  timestamp for anything user-facing.
+- `exam_findings` — vitals are misread (a real BP of 140/80 came back as PR 110/80). Showing
+  a wrong blood pressure in a health app is worse than showing nothing.
+
+Both are extracted and stored for completeness. Neither is trustworthy enough to show.
+
+`medicines`, `complaint`, `diagnosis` and `patient` can be shown read-only as context, but
+they are not editable and do not drive anything.
+
+### 4.5 New timeline entries
+
+```json
+{ "at": "...", "actor": "intake_agent", "action": "awaiting_confirmation",
+  "detail": "4 tests read from prescription — asked patient to confirm" }
+{ "at": "...", "actor": "patient", "action": "confirmed_tests",
+  "detail": "3 of 4 tests confirmed, 1 removed" }
+```
+
+### 4.6 Why this earns marks
+
+Design is one of five equally weighted criteria in this hackathon, and it asks whether the
+project is a complete product experience rather than a technical proof of concept. An agent
+that says "here's what I read, confirm before I book" reads as trustworthy. An agent that
+silently books four tests off a handwriting guess reads as reckless — even when it's right.
+
+Make this screen good. It is the most defensible thing in the product.
+
+---
+
+## 5. Coverage extension (OPTIONAL — build only if ahead of schedule)
 
 **Do not build UI for this until Shashank confirms the backend is shipping it.** If it does not get built, none of the fields below appear and nothing breaks.
 
@@ -174,7 +287,7 @@ Example entry:
 
 ---
 
-## 5. Rendering guidance for coverage
+## 6. Rendering guidance for coverage
 
 If it gets built, the display rules that matter:
 
@@ -186,6 +299,7 @@ If it gets built, the display rules that matter:
 
 ---
 
-## 6. Change log
+## 7. Change log
 
 - `2026-09-03` — v2 created. v1 contract unchanged; coverage extension added as optional.
+- `2026-09-07` — added the extraction confirmation step (section 4) as core scope: new state `AWAITING_CONFIRMATION`, new endpoint `POST /api/episodes/{id}/confirm`, new `confirmation` field. Model extraction is reliable on the test list but misreads dates and vitals, so those are stored but not displayed.

@@ -39,7 +39,26 @@ That means polish is no longer optional garnish. Specific things worth your time
 - **`NEEDS_HUMAN`** — a graceful, clearly-worded failure state with a working retry. Judges look for this.
 - **Consistency pass.** Same spacing, same type scale, same button styles throughout. Incoherence is what separates "product" from "proof of concept."
 
-### 2.3 The legacy MedLifeSim UI — decide and act
+### 2.3 Build the confirmation screen — NEW, core scope
+
+This is the one genuinely new screen. Full spec in `api-contract-v2.md` section 4.
+
+**Why it exists:** we tested prescription extraction against three real handwritten prescriptions. The model reads the *test list* reliably — 4 of 4 on a hard one — but misreads dates and vitals, and asserts them confidently. So the agent must not book anything until the patient has confirmed what it read.
+
+**New state:** `AWAITING_CONFIRMATION`, sitting between `TESTS_IDENTIFIED` and `LABS_SHORTLISTED`. It's terminal until acted on — stop polling, nothing happens until the patient responds.
+
+**The screen needs:**
+- The extracted test list, each row **editable and removable**
+- **The prescription image alongside it** — without this the confirmation is meaningless, since the patient has nothing to check against
+- An urgency toggle per test
+- Primary action: "Confirm and find labs"
+- Secondary: "I need to re-upload"
+
+**Two fields the API returns that you must NOT display:** `date` and `exam_findings`. The model misreads DD.MM.YY dates (a real 17.03.17 came back as 2014-03-14) and misreads vitals (a real BP of 140/80 came back as PR 110/80). They're stored for completeness but showing a wrong blood pressure in a health app is worse than showing nothing.
+
+**Make this screen good.** Design is one of five equally weighted criteria here, and it asks whether this is a complete product or a technical proof of concept. An agent that says "here's what I read, confirm before I book" is the most defensible thing in the whole product.
+
+### 2.4 The legacy MedLifeSim UI — decide and act
 
 `src/renderer/` holds the old simulation UI, kept for internal use, with a `react-router-dom` shim.
 
@@ -50,7 +69,7 @@ That means polish is no longer optional garnish. Specific things worth your time
 
 Keep it in the old repo where it belongs. If you want it preserved, put it on a branch.
 
-### 2.4 Live demo link — matters for scoring
+### 2.5 Live demo link — matters for scoring
 
 The rules say projects with a live demo score higher on Technical Implementation. You already produce a static export, so this is nearly free.
 
@@ -99,8 +118,10 @@ The video is max 5 minutes and Presentation is a full criterion. Two things from
 ## 6. Definition of done
 
 - [ ] Deployed, public URL, reachable
-- [ ] All 12 states render without crashing
+- [ ] All 13 states render without crashing (12 + `AWAITING_CONFIRMATION`)
 - [ ] Nulls handled — early states are mostly null
+- [ ] Confirmation screen: editable tests, prescription image alongside, working confirm
+- [ ] `date` and `exam_findings` NOT displayed anywhere
 - [ ] Timeline distinguishes agent from patient actions
 - [ ] Results table shows values, ranges, flags, trends
 - [ ] Disclaimer visible wherever findings appear

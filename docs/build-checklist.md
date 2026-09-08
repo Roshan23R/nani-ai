@@ -6,8 +6,9 @@ Strategy and reasoning live in `aws-build-plan.md`. This file is only *what to d
 One rule: **do not skip ahead.** The order encodes dependencies, and the spine (Phase 1)
 blocks everything after it.
 
-> ### ▶ NEXT UP — step 06, the idempotency claim
-> `backend/state/idempotency.py`. The table is live and the machine is done and tested.
+> ### ▶ NEXT UP — step 20, the confirmation screen (Rakesh)
+> The backend cascade runs end to end on AWS, unattended. What is left is the
+> frontend, the video, and the console tasks only you can do — steps 01, 03, 22, 23, 28–30.
 
 ---
 
@@ -21,7 +22,7 @@ blocks everything after it.
 - [ ] **03** Credits form — **closes Sep 11, 12:00pm PT.** Rules page and resources page link different forms; submit both
 - [ ] **03b** Billing alarm at $25 (you have $50, not $300)
 - [ ] **04** Load Places key + Calendar OAuth into Secrets Manager (currently empty)
-- [ ] **04b** **Anonymise demo identities** — real patient names came out of both prescriptions. Invented names in every seed record, mock and on-screen string before the repo goes public or anything is recorded
+- [x] **04b** Anonymised: every seeded name is invented, `demo-data/` gitignored
 
 ---
 
@@ -31,35 +32,35 @@ blocks everything after it.
 step on the timeline.** Nothing here calls a third-party API. This is the week's hard part.
 
 - [x] **05** `backend/state/machine.py` — 14 states, legal-transition table, `assert_legal()` raises. Confidence routing included. 26 tests green
-- [ ] **06** `backend/state/idempotency.py` — atomic claim on `{episode_id}:{test_code}:{attempt}` via `ConditionExpression="attribute_not_exists(PK)"`, with a TTL. Write it *before* anything can send email
-- [ ] **07** `backend/tools/store.py` — single-table access: put/get episode, append `timeline[]`, list by patient, read/write result history. Keys exactly as in build plan §3
-- [ ] **08** `backend/coordinator.py` — plain-Python driver. Intake real; logistics and diagnostics return canned dicts. Every transition appends a timeline entry. **No LLM decides sequence**
-- [ ] **09** `backend/scripts/run_episode.py` — walks the whole cascade on a real prescription and prints the timeline. **When this passes, the hard part is behind you**
+- [x] **06** `backend/state/idempotency.py` — atomic claim, proven: 4 tests, 2 scheduler fires, exactly 4 emails
+- [x] **07** `backend/tools/store.py` — single-table store, floats round-trip as floats, nulls preserved
+- [x] **08** `backend/coordinator.py` — dispatch table, one bounded step per call, illegal moves raise
+- [x] **09** `backend/scripts/run_episode.py` — full cascade upload → CLOSED, both paths verified
 
 ---
 
 ## Phase 2 · API and the first real render — Sep 9
 
-- [ ] **10** `backend/api/main.py` — FastAPI, plain uvicorn, containerised for App Runner. All eight endpoints. Episode serialises to the frozen v1 shape; diff field-by-field against `client/public/mocks/02-tests-identified.json` before moving on
+- [x] **10** `backend/api/main.py` — 8 endpoints, diffed field-by-field against the frozen mocks
 - [ ] **11** Point the client at localhost — `NEXT_PUBLIC_USE_MOCKS=false`. The 21 components in `client/src/care/` already render every state; this is where wrong fields surface
 
 ---
 
 ## Phase 3 · Replace the stubs — Sep 9–10
 
-- [ ] **12** `backend/tools/places.py` — nearby labs via Google Places (staying on Google: Amazon Location's India POI coverage for pathology labs is too thin to risk)
-- [ ] **13** `backend/tools/ses.py` — booking request email. **SES sandbox: 1/second, 200/day.** Throttle the loop or a four-test prescription throws. Six verified addresses already exist
-- [ ] **14** `backend/tools/calendar.py` — Google Calendar slot hold (no AWS equivalent exists)
-- [ ] **15** `backend/agents/logistics.py` — Strands `@tool` functions over 12–14, on the fast model. **Claim idempotency inside the tool, before the send**
-- [ ] **16** `backend/tools/s3.py` + `backend/scripts/deliver_report.py` — the report inbox, and a way to play the part of the lab so you can rehearse
-- [ ] **17** `backend/agents/diagnostics.py` — values and reference ranges **from the report itself**, compared against stored history, then one significance call on the smart model
-- [ ] **18** `POST /api/tick` + EventBridge schedule — the second trigger, and what makes this agentic rather than a document reader
+- [x] **12** `backend/tools/places.py` — Google Places with a canned Kolkata fallback
+- [x] **13** `backend/tools/ses.py` — live send verified, 1/sec throttle for the sandbox
+- [x] **14** `backend/tools/calendar.py` — OAuth refresh-token flow, no extra SDK
+- [x] **15** `backend/agents/logistics.py` — Strands agent with a @tool, structured output for lab choice
+- [x] **16** `backend/tools/s3.py` + inbox — autonomous pickup verified in production
+- [x] **17** `backend/agents/diagnostics.py` — reads ranges off the report, smart model for significance
+- [x] **18** `POST /api/tick` + EventBridge every 2 min — verified advancing a live episode unattended
 
 ---
 
 ## Phase 4 · Confirmation step — Sep 10 · runs parallel to Phase 3
 
-- [ ] **19** Backend: `AWAITING_CONFIRMATION`, `POST /api/episodes/{id}/confirm`, and the `confirmation` object (`extracted_tests`, `confirmed_tests`, `edits_made`). Terminal until acted on
+- [x] **19** `AWAITING_CONFIRMATION` + `/confirm` + the `confirmation` object
 - [x] **19b** **Decided Sep 8: yes.** `high` books autonomously, `medium` confirms, `low`/no tests escalates. CLAUDE.md rule 3 rewritten to match; logic in `state/machine.py:route_after_extraction`
 - [ ] **20** Frontend (Rakesh): state in `types.ts` + `stateLabels.ts`, mock `10-awaiting-confirmation.json`, then the screen — editable removable rows, urgency toggle, **prescription image alongside**. Never render `date` or `exam_findings`. See `frontend-brief-aws.md` §0 and §2.2
 
@@ -70,7 +71,7 @@ step on the timeline.** Nothing here calls a third-party API. This is the week's
 **Ship the boring deploy first, then attempt AgentCore as an upgrade.** A failed AgentCore
 run with no fallback live means no demo at all.
 
-- [ ] **21** Container to App Runner. Point the EventBridge schedule at the deployed tick endpoint, not your laptop
+- [x] **21** Lambda + API Gateway live at https://sbm1mkp3ql.execute-api.us-east-1.amazonaws.com
 - [ ] **22** Frontend rebuild + redeploy with the real `NEXT_PUBLIC_API_BASE_URL` — `output: 'export'` bakes it in at build time
 - [ ] **23** AgentCore attempt — **only** with 21 and 22 green, timeboxed to one day, abandoned without regret
 
@@ -78,10 +79,10 @@ run with no fallback live means no demo at all.
 
 ## Phase 6 · Make it demonstrable — Sep 12
 
-- [ ] **24** Seed a patient profile and prior results so `TRENDS_ANALYZED` has something to compare. A trend with one point is not a trend
+- [x] **24** `backend/scripts/seed_demo.py` — invented names, HB history 12.4 → 11.1 → 9.6
 - [ ] **25** Walk both paths: happy path end to end, then `IMG_2071` → `NEEDS_HUMAN` → retry
-- [ ] **26** **Fire the scheduler twice deliberately** and prove no duplicate email leaves. This is what step 06 exists for
-- [ ] **27** README rewrite, architecture diagram, prior-work disclosure verbatim in README *and* Devpost
+- [x] **26** Double-fire proven — 4 tests, 2 fires, 4 emails
+- [x] **27** README rewritten: architecture, models, setup, disclosure
 
 ---
 

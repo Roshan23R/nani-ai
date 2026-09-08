@@ -51,6 +51,16 @@ BUILD = Path("/tmp/nani-lambda-build")
 APP_DIRS = ["agents", "api", "state", "tools"]
 APP_FILES = ["coordinator.py"]
 
+# API Gateway's own CORS config answers the preflight and overrides whatever
+# FastAPI's middleware would say, so PUT/PATCH must be listed here too or the
+# profile save fails in the browser with no server-side error.
+CORS = {
+    "AllowOrigins": ["*"],
+    "AllowMethods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    "AllowHeaders": ["*"],
+    "MaxAge": 600,
+}
+
 TRUST = {
     "Version": "2012-10-17",
     "Statement": [
@@ -216,17 +226,14 @@ def ensure_api(function_arn: str) -> str:
     )
     if existing:
         api_id, url = existing["ApiId"], existing["ApiEndpoint"]
-        print(f"  api exists: {api_id}")
+        api.update_api(ApiId=api_id, CorsConfiguration=CORS)
+        print(f"  api exists: {api_id} (cors refreshed)")
     else:
         created = api.create_api(
             Name=API_NAME,
             ProtocolType="HTTP",
             Target=function_arn,
-            CorsConfiguration={
-                "AllowOrigins": ["*"],
-                "AllowMethods": ["GET", "POST", "OPTIONS"],
-                "AllowHeaders": ["*"],
-            },
+            CorsConfiguration=CORS,
         )
         api_id, url = created["ApiId"], created["ApiEndpoint"]
         print(f"  api created: {api_id}")

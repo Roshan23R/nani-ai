@@ -34,6 +34,10 @@ from agents.strands_setup import (
 # is rejected at the API boundary, so it must be normalised to "jpeg".
 IMAGE_FORMATS = {"jpeg", "jpg", "png", "gif", "webp"}
 
+#: Bedrock also accepts text documents. Labs do email CSV and plain-text
+#: results, and it is the cheapest way to rehearse the report path.
+DOC_FORMATS = {"pdf", "csv", "txt", "md", "html", "doc", "docx", "xls", "xlsx"}
+
 PROCEED = "PROCEED"
 NEEDS_HUMAN = "NEEDS_HUMAN"
 
@@ -69,19 +73,20 @@ def build_content_block(path: str) -> ContentBlock:
     with open(path, "rb") as f:
         raw = f.read()
 
-    if ext == "pdf":
+    if ext in DOC_FORMATS:
         # Document names must be alphanumeric plus spaces/hyphens/parens.
         safe_name = (
             re.sub(r"[^A-Za-z0-9 \-()\[\]]", "", os.path.basename(path)) or "prescription"
         )
-        return {"document": {"format": "pdf", "name": safe_name, "source": {"bytes": raw}}}
+        return {"document": {"format": ext, "name": safe_name, "source": {"bytes": raw}}}
 
     if ext in IMAGE_FORMATS:
         fmt = "jpeg" if ext == "jpg" else ext
         return {"image": {"format": fmt, "source": {"bytes": raw}}}
 
     raise ValueError(
-        f"Unsupported file type '{ext or path}'. Use jpg, png, gif, webp or pdf. "
+        f"Unsupported file type '{ext or path}'. Images: {sorted(IMAGE_FORMATS)}. "
+        f"Documents: {sorted(DOC_FORMATS)}. "
         "(HEIC is not accepted by Bedrock — convert it first.)"
     )
 

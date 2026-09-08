@@ -227,8 +227,10 @@ export function getDeviceCoords(): Promise<{ lat: number; lng: number } | null> 
 export async function listPatients(): Promise<Patient[]> {
   if (USE_MOCKS) return [...MOCK_PATIENTS]
   try {
-    const data = await liveFetch<{ patients: Patient[] }>('/api/patients')
-    return data.patients?.length ? data.patients : MOCK_PATIENTS
+    // Deployed API may return a bare array; contract shape is { patients: [...] }.
+    const data = await liveFetch<Patient[] | { patients: Patient[] }>('/api/patients')
+    const patients = Array.isArray(data) ? data : data.patients
+    return patients?.length ? patients : MOCK_PATIENTS
   } catch {
     return [...MOCK_PATIENTS]
   }
@@ -240,10 +242,11 @@ export async function listEpisodes(patientId: string = DEFAULT_PATIENT_ID): Prom
     if (patientId !== PATIENT_ID) return []
     return [...list]
   }
-  const data = await liveFetch<{ episodes: EpisodeSummary[] }>(
+  // Deployed API may return a bare array; contract shape is { episodes: [...] }.
+  const data = await liveFetch<EpisodeSummary[] | { episodes: EpisodeSummary[] }>(
     `/api/episodes?patient_id=${encodeURIComponent(patientId)}`,
   )
-  return data.episodes
+  return (Array.isArray(data) ? data : data.episodes) ?? []
 }
 
 export async function getEpisode(episodeId: string): Promise<Episode> {

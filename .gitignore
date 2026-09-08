@@ -1,0 +1,24 @@
+# Real prescriptions — real patient names. Never commit.
+demo-data/
+
+# Credentials
+.env
+.env.*
+!.env.example
+*accessKeys*.csv
+*.pem
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+client/.next/
+client/out/
+
+# macOS
+.DS_Store

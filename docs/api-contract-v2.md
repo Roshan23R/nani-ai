@@ -303,3 +303,9 @@ If it gets built, the display rules that matter:
 
 - `2026-09-03` — v2 created. v1 contract unchanged; coverage extension added as optional.
 - `2026-09-07` — added the extraction confirmation step (section 4) as core scope: new state `AWAITING_CONFIRMATION`, new endpoint `POST /api/episodes/{id}/confirm`, new `confirmation` field. Model extraction is reliable on the test list but misreads dates and vitals, so those are stored but not displayed.
+- `2026-09-08` — **backend routing:** `confirmation.required` is now `false` when extraction confidence is `high`; those episodes skip `AWAITING_CONFIRMATION` and go straight to `LABS_SHORTLISTED`. `medium` still confirms, `low`/no tests still escalates. No shape change — the field was always a boolean.
+- `2026-09-08` — **collection endpoints now return wrapped objects, not bare arrays.** Logged after the fact; this shipped in `a76e18a` without being raised first.
+  - `GET /api/patients` → `{"patients": [...]}` (was `[...]`)
+  - `GET /api/episodes` → `{"episodes": [...]}` (was `[...]`)
+  - `client/src/care/api.ts` accepts either shape, so nothing broke. New: `GET/PUT/PATCH /api/patients/{id}` for the care profile.
+  - **The mock files in `client/public/mocks/` are per-episode and unaffected**, but any other consumer written against the v1 list shape is not.

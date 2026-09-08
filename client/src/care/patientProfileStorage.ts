@@ -103,6 +103,58 @@ export function savePatientProfile(patientId: string, profile: PatientLocalProfi
   writeAll(all)
 }
 
+/** Map a remote PROFILE document into the local care-profile shape. */
+export function remoteToLocalProfile(
+  remote: {
+    name?: string
+    city?: string
+    email?: string | null
+    avatar_url?: string | null
+    care?: Record<string, unknown> | null
+  },
+  fallbackName = '',
+): PatientLocalProfile {
+  const care = (remote.care ?? {}) as Partial<PatientLocalProfile>
+  const displayName =
+    (typeof care.displayName === 'string' && care.displayName.trim()) ||
+    remote.name?.trim() ||
+    fallbackName ||
+    'Patient'
+  return {
+    heightUnit: care.heightUnit === 'ft' ? 'ft' : 'cm',
+    weightUnit: care.weightUnit === 'lb' ? 'lb' : 'kg',
+    ...care,
+    displayName,
+    email: (typeof care.email === 'string' && care.email) || remote.email || undefined,
+    avatarUrl:
+      (typeof care.avatarUrl === 'string' && care.avatarUrl) || remote.avatar_url || undefined,
+    location:
+      (typeof care.location === 'string' && care.location) || remote.city || undefined,
+  }
+}
+
+/** Build the PUT body for /api/patients/{id} from local care profile. */
+export function localToRemotePayload(
+  profile: PatientLocalProfile,
+  extras?: { scenario?: string; city?: string },
+): {
+  name: string
+  city: string
+  scenario: string
+  email: string | null
+  avatar_url: string | null
+  care: PatientLocalProfile
+} {
+  return {
+    name: profile.displayName,
+    city: extras?.city ?? profile.location ?? '',
+    scenario: extras?.scenario ?? '',
+    email: profile.email ?? null,
+    avatar_url: profile.avatarUrl ?? null,
+    care: profile,
+  }
+}
+
 export function defaultProfileForPatient(patient: Patient): PatientLocalProfile {
   return {
     displayName: patient.name,
@@ -124,10 +176,33 @@ export function mergeProfile(
     ...stored,
     displayName: stored.displayName?.trim() || base.displayName,
     location: stored.location?.trim() || base.location,
+    email: stored.email?.trim() || base.email,
     avatarUrl: stored.avatarUrl || base.avatarUrl,
     heightUnit: stored.heightUnit ?? 'cm',
     weightUnit: stored.weightUnit ?? 'kg',
   }
+}
+
+/** Prefill / refresh name, email, and avatar from a Google sign-in. Keeps other fields. */
+export function prefillPatientProfileFromGoogle(user: {
+  patient_id: string
+  name: string
+  email: string
+  picture?: string
+}): PatientLocalProfile {
+  const stored = getPatientProfile(user.patient_id)
+  const firstName = user.name.trim().split(/\s+/)[0] || user.name
+  const next: PatientLocalProfile = {
+    heightUnit: 'cm',
+    weightUnit: 'kg',
+    ...stored,
+    displayName: user.name.trim() || stored?.displayName || 'Google user',
+    preferredName: stored?.preferredName?.trim() || firstName,
+    email: user.email.trim() || stored?.email,
+    avatarUrl: user.picture || stored?.avatarUrl || resolveAvatarUrl(user.name, undefined),
+  }
+  savePatientProfile(user.patient_id, next)
+  return next
 }
 
 export function profileToForm(profile: PatientLocalProfile): PatientProfileForm {

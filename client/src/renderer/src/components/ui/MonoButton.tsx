@@ -48,9 +48,9 @@ export default function MonoButton({
       whileHover={disabled ? undefined : { scale: 1.02 }}
       whileTap={disabled ? undefined : { scale: 0.98 }}
       style={{
-        padding: '6px 14px',
+        padding: '10px 18px',
         ...VARIANT_STYLES[variant],
-        borderRadius: 6,
+        borderRadius: 8,
         fontFamily: monoFont,
         fontSize: 10,
         fontWeight: 700,

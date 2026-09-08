@@ -3,6 +3,7 @@
 import type { TimelineEntry } from '../types'
 import { actionLabel } from '../stateLabels'
 import SectionLabel from '../../renderer/src/components/ui/SectionLabel'
+import EmptyState from './EmptyState'
 import {
   ACTOR_LABELS,
   agentAccent,
@@ -15,7 +16,7 @@ import {
   sansFont,
 } from '../ui'
 import { LinkifiedText } from './TextLink'
-import { Bot, User } from 'lucide-react'
+import { Bot, History, User } from 'lucide-react'
 
 function isAgent(actor: TimelineEntry['actor']) {
   return actor !== 'patient'
@@ -26,101 +27,195 @@ export default function EpisodeTimeline({ entries }: { entries: TimelineEntry[] 
 
   return (
     <section style={cardStyle}>
-      <SectionLabel>Timeline</SectionLabel>
-      <p style={{ fontSize: 13, color: MUTED, margin: '0 0 24px', lineHeight: 1.55 }}>
-        Every step NaniAi took — and anything you uploaded — in order.
-      </p>
-      <div style={{ position: 'relative', paddingLeft: 36 }}>
-        <div
-          style={{
-            position: 'absolute',
-            left: 15,
-            top: 12,
-            bottom: 12,
-            width: 2,
-            background: 'linear-gradient(180deg, #e0e0f0 0%, #eeeef6 100%)',
-            borderRadius: 2,
-          }}
-        />
-        {sorted.map((entry, i) => {
-          const agent = isAgent(entry.actor)
-          const dotColor = agent ? agentAccent : patientAccent
-          const isLast = i === sorted.length - 1
-          return (
-            <div
-              key={`${entry.at}-${entry.action}`}
-              style={{
-                position: 'relative',
-                paddingBottom: isLast ? 0 : 24,
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  left: -28,
-                  top: 2,
-                  width: 30,
-                  height: 30,
-                  borderRadius: agent ? 8 : 999,
-                  background: agent ? `${dotColor}12` : `${dotColor}18`,
-                  border: `2px solid ${dotColor}`,
-                  display: 'grid',
-                  placeItems: 'center',
-                  color: dotColor,
-                }}
-              >
-                {agent ? <Bot size={14} strokeWidth={2.2} /> : <User size={14} strokeWidth={2.2} />}
-              </div>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          gap: 12,
+          marginBottom: 8,
+        }}
+      >
+        <div>
+          <SectionLabel>Timeline</SectionLabel>
+          <p style={{ fontSize: 14, color: MUTED, margin: 0, lineHeight: 1.55, maxWidth: 420 }}>
+            Every step NaniAi took — and anything you uploaded — in order.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <LegendDot color={agentAccent} square label="Agent" />
+          <LegendDot color={patientAccent} square={false} label="You" />
+        </div>
+      </div>
 
+      {!sorted.length ? (
+        <EmptyState
+          icon={<History size={28} strokeWidth={1.75} />}
+          title="No events yet"
+          body="As soon as NaniAi starts working this episode, each action will appear here."
+        />
+      ) : (
+        <div style={{ position: 'relative', paddingLeft: 40, marginTop: 20 }}>
+          <div
+            style={{
+              position: 'absolute',
+              left: 17,
+              top: 14,
+              bottom: 14,
+              width: 3,
+              background: `linear-gradient(180deg, ${agentAccent}55 0%, ${patientAccent}44 100%)`,
+              borderRadius: 3,
+            }}
+          />
+          {sorted.map((entry, i) => {
+            const agent = isAgent(entry.actor)
+            const accent = agent ? agentAccent : patientAccent
+            const isLast = i === sorted.length - 1
+            return (
               <div
+                key={`${entry.at}-${entry.action}-${i}`}
                 style={{
-                  padding: '12px 16px',
-                  borderRadius: 12,
-                  background: agent ? '#fafafe' : `${patientAccent}08`,
-                  border: `1px solid ${agent ? '#eeeef6' : `${patientAccent}22`}`,
+                  position: 'relative',
+                  paddingBottom: isLast ? 0 : 22,
                 }}
               >
                 <div
                   style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '6px 12px',
-                    alignItems: 'center',
-                    marginBottom: 6,
+                    position: 'absolute',
+                    left: -32,
+                    top: 4,
+                    width: 34,
+                    height: 34,
+                    borderRadius: agent ? 10 : 999,
+                    background: agent ? accent : '#fff',
+                    border: `2.5px solid ${accent}`,
+                    boxShadow: agent
+                      ? `0 0 0 4px ${accent}18`
+                      : `0 0 0 4px ${accent}22`,
+                    display: 'grid',
+                    placeItems: 'center',
+                    color: agent ? '#fff' : accent,
+                    zIndex: 1,
                   }}
                 >
-                  <span
+                  {agent ? <Bot size={15} strokeWidth={2.4} /> : <User size={15} strokeWidth={2.4} />}
+                </div>
+
+                <div
+                  style={{
+                    padding: '14px 18px',
+                    borderRadius: 12,
+                    background: agent
+                      ? `linear-gradient(135deg, ${accent}0a 0%, #fafafe 48%)`
+                      : `linear-gradient(135deg, ${accent}12 0%, #fff 55%)`,
+                    border: `1.5px solid ${agent ? `${accent}28` : `${accent}40`}`,
+                    borderLeft: `4px solid ${accent}`,
+                  }}
+                >
+                  <div
                     style={{
-                      fontFamily: monoFont,
-                      fontSize: 9,
-                      letterSpacing: '0.12em',
-                      textTransform: 'uppercase',
-                      color: dotColor,
-                      fontWeight: 700,
-                      padding: '3px 8px',
-                      borderRadius: 4,
-                      background: `${dotColor}14`,
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '6px 12px',
+                      alignItems: 'center',
+                      marginBottom: 8,
                     }}
                   >
-                    {ACTOR_LABELS[entry.actor]}
-                  </span>
-                  <span style={{ fontFamily: monoFont, fontSize: 10, color: MUTED }}>
-                    {formatTimestamp(entry.at)}
-                  </span>
-                </div>
-                <p style={{ fontSize: 15, fontWeight: 600, color: NAVY, margin: '0 0 4px', lineHeight: 1.35 }}>
-                  {actionLabel(entry.action)}
-                </p>
-                {entry.detail && (
-                  <p style={{ fontSize: 13, color: '#4a4a78', margin: 0, lineHeight: 1.55, fontFamily: sansFont }}>
-                    <LinkifiedText text={entry.detail} />
+                    <span
+                      style={{
+                        fontFamily: monoFont,
+                        fontSize: 10,
+                        letterSpacing: '0.12em',
+                        textTransform: 'uppercase',
+                        color: agent ? '#fff' : accent,
+                        fontWeight: 700,
+                        padding: '4px 10px',
+                        borderRadius: agent ? 6 : 999,
+                        background: agent ? accent : `${accent}18`,
+                      }}
+                    >
+                      {ACTOR_LABELS[entry.actor]}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: monoFont,
+                        fontSize: 11,
+                        color: MUTED,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {formatTimestamp(entry.at)}
+                    </span>
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 600,
+                      color: NAVY,
+                      margin: '0 0 4px',
+                      lineHeight: 1.35,
+                      letterSpacing: '-0.01em',
+                    }}
+                  >
+                    {actionLabel(entry.action)}
                   </p>
-                )}
+                  {entry.detail && (
+                    <p
+                      style={{
+                        fontSize: 14,
+                        color: '#4a4a78',
+                        margin: 0,
+                        lineHeight: 1.55,
+                        fontFamily: sansFont,
+                      }}
+                    >
+                      <LinkifiedText text={entry.detail} />
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
     </section>
+  )
+}
+
+function LegendDot({
+  color,
+  square,
+  label,
+}: {
+  color: string
+  square: boolean
+  label: string
+}) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        fontFamily: monoFont,
+        fontSize: 10,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        color: MUTED,
+        fontWeight: 600,
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 12,
+          height: 12,
+          borderRadius: square ? 3 : 999,
+          background: color,
+        }}
+      />
+      {label}
+    </span>
   )
 }

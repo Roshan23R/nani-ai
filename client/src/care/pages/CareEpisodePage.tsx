@@ -9,6 +9,7 @@ import {
   CalendarCheck,
   Check,
   ClipboardList,
+  FileQuestion,
   FileUp,
   FlaskConical,
   Hourglass,
@@ -32,6 +33,7 @@ import PrescriptionCard from '../components/PrescriptionCard'
 import ReportUploadModal from '../components/ReportUploadModal'
 import ResultsTable from '../components/ResultsTable'
 import CareLoader from '../components/CareLoader'
+import EmptyState from '../components/EmptyState'
 import EpisodeStatusBanner from '../components/EpisodeStatusBanner'
 import MonoButton from '../../renderer/src/components/ui/MonoButton'
 import { LIGHT_BLUE, MUTED, NAVY, TEAL, monoFont, pageBackground, sansFont } from '../ui'
@@ -161,8 +163,13 @@ export default function CareEpisodePage({
     ) {
       ids.push('labs')
     }
-    if (episode.bookings.length > 0) ids.push('bookings')
-    if (episode.report?.values && episode.report.values.length > 0) ids.push('results')
+    if (
+      episode.bookings.length > 0 ||
+      ['BOOKING_REQUESTED', 'AWAITING_REPORT'].includes(episode.state)
+    ) {
+      ids.push('bookings')
+    }
+    if (episode.report) ids.push('results')
     if (episode.analysis) ids.push('findings')
     if (episode.consultation) ids.push('consult')
     return ids
@@ -206,9 +213,20 @@ export default function CareEpisodePage({
 
   if (!episode) {
     return (
-      <div style={{ padding: 48, fontFamily: sansFont }}>
-        <p>Episode not found.</p>
-        <TextLink href={CARE_EPISODES}>← All episodes</TextLink>
+      <div
+        style={{
+          padding: 48,
+          fontFamily: sansFont,
+          background: pageBackground,
+          minHeight: embedded ? 'calc(100vh - 56px)' : '100vh',
+        }}
+      >
+        <EmptyState
+          icon={<FileQuestion size={32} strokeWidth={1.75} />}
+          title="Episode not found"
+          body="This care episode may have been removed, or the link is out of date."
+          action={<TextLink href={CARE_EPISODES}>← All episodes</TextLink>}
+        />
       </div>
     )
   }
@@ -605,18 +623,19 @@ export default function CareEpisodePage({
               {activePanel === 'prescription' && episode.prescription && (
                 <PrescriptionCard prescription={episode.prescription} />
               )}
-              {activePanel === 'labs' && <LabsCard labs={episode.labs} />}
-              {activePanel === 'bookings' && episode.bookings.length > 0 && (
-                <BookingsCard bookings={episode.bookings} />
+              {activePanel === 'labs' && (
+                <LabsCard
+                  labs={episode.labs}
+                  searching={['TESTS_IDENTIFIED', 'LABS_SHORTLISTED'].includes(episode.state) && !episode.labs.length}
+                />
               )}
-              {activePanel === 'results' &&
-                episode.report?.values &&
-                episode.report.values.length > 0 && (
-                  <ResultsTable
-                    values={episode.report.values}
-                    sourceFileUrl={episode.report.source_file_url}
-                  />
-                )}
+              {activePanel === 'bookings' && <BookingsCard bookings={episode.bookings} />}
+              {activePanel === 'results' && (
+                <ResultsTable
+                  values={episode.report?.values ?? []}
+                  sourceFileUrl={episode.report?.source_file_url}
+                />
+              )}
               {activePanel === 'findings' && episode.analysis && (
                 <FindingsPanel analysis={episode.analysis} />
               )}

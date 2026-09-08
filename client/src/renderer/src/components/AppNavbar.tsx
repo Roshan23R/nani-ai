@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { CARE_PROFILE } from '../../../care/routes'
 import PatientPicker from '../../../care/components/PatientPicker'
+import { usePatient } from '../../../care/context/PatientContext'
 import { TEAL, sansFont } from '../theme'
 import { UserAvatarWithLabel } from './UserAvatar'
 import NaniLogo from './NaniLogo'
@@ -19,8 +20,11 @@ interface Profile {
 }
 
 export default function AppNavbar({ profile }: { profile?: Profile }) {
+  const { googleUser, patientId } = usePatient()
   const name = profile?.name ?? 'Guest'
   const avatarSrc = profile?.avatarUrl ?? notionAvatarUrl(DEFAULT_NOTION_AVATAR)
+  const fromGoogle = !!googleUser && googleUser.patient_id === patientId
+  const subtitle = fromGoogle ? googleUser.email || 'Google' : 'Patient'
 
   return (
     <header
@@ -45,26 +49,26 @@ export default function AppNavbar({ profile }: { profile?: Profile }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <PatientPicker />
         <Link
-        href={CARE_PROFILE}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          textDecoration: 'none',
-          color: 'inherit',
-          padding: '4px 8px 4px 4px',
-          borderRadius: 8,
-          border: '1px solid transparent',
-          transition: 'border-color 0.15s',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = '#e0e0f0'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'transparent'
-        }}
-      >
-        <UserAvatarWithLabel name={name} src={avatarSrc} subtitle="Patient" size={40} />
+          href={CARE_PROFILE}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            textDecoration: 'none',
+            color: 'inherit',
+            padding: '4px 8px 4px 4px',
+            borderRadius: 8,
+            border: '1px solid transparent',
+            transition: 'border-color 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#e0e0f0'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'transparent'
+          }}
+        >
+          <UserAvatarWithLabel name={name} src={avatarSrc} subtitle={subtitle} size={40} />
         </Link>
       </div>
     </header>

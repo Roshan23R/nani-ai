@@ -176,7 +176,7 @@ export default function ParameterTrendChart({ trend, index = 0 }: ParameterTrend
             <polyline
               fill="none"
               stroke={lineColor}
-              strokeWidth={2.5}
+      strokeWidth={3.25}
               strokeLinejoin="round"
               strokeLinecap="round"
               points={linePts}
@@ -210,7 +210,7 @@ export default function ParameterTrendChart({ trend, index = 0 }: ParameterTrend
                 <circle
                   cx={x}
                   cy={y}
-                  r={isLatest || isHovered ? 5.5 : 4}
+                  r={isLatest || isHovered ? 7 : 5.5}
                   fill={outOfRange ? '#c83030' : isLatest || isHovered ? lineColor : '#fff'}
                   stroke={outOfRange ? '#c83030' : lineColor}
                   strokeWidth={2}

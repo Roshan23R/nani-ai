@@ -2,10 +2,13 @@
 
 import type { Lab } from '../types'
 import SectionLabel from '../../renderer/src/components/ui/SectionLabel'
+import EmptyState from './EmptyState'
+import CareLoader from './CareLoader'
 import { BLUE, cardStyle, MUTED, NAVY, TEAL, monoFont } from '../ui'
 import { ExternalLink, mapsUrl } from './TextLink'
+import { FlaskConical } from 'lucide-react'
 
-export default function LabsCard({ labs }: { labs: Lab[] }) {
+export default function LabsCard({ labs, searching = false }: { labs: Lab[]; searching?: boolean }) {
   return (
     <section style={cardStyle}>
       <SectionLabel>Labs</SectionLabel>
@@ -13,7 +16,15 @@ export default function LabsCard({ labs }: { labs: Lab[] }) {
         Nearby labs NaniAi shortlisted — the selected one is highlighted.
       </p>
       {!labs.length ? (
-        <p style={{ fontSize: 14, color: MUTED, margin: 0 }}>Searching for nearby labs…</p>
+        searching ? (
+          <CareLoader variant="block" label="Searching nearby labs…" minHeight={120} />
+        ) : (
+          <EmptyState
+            icon={<FlaskConical size={26} strokeWidth={1.75} />}
+            title="No labs shortlisted yet"
+            body="Once tests are confirmed, NaniAi finds nearby diagnostics centres here."
+          />
+        )
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {labs.map((lab) => (

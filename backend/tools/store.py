@@ -196,13 +196,9 @@ def get_patient(patient_id: str) -> dict | None:
 
 
 def list_patients() -> list[dict]:
-    """Demo profiles. A scan is fine — there are a handful of rows."""
-    resp = table().scan(
-        FilterExpression=Key("SK").eq("PROFILE"),
-        ProjectionExpression="patient_id, #n, city, dob",
-        ExpressionAttributeNames={"#n": "name"},
-    )
-    return [_decode(i) for i in resp.get("Items", [])]
+    """Patient PROFILE rows. A scan is fine — there are a handful of demo + Google users."""
+    resp = table().scan(FilterExpression=Key("SK").eq("PROFILE"))
+    return [_strip_keys(_decode(i)) for i in resp.get("Items", [])]
 
 
 # --- result history (what the trend comparison reads) ----------------------

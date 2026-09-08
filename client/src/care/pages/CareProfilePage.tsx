@@ -3,25 +3,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Activity, Check, Heart, User } from 'lucide-react'
-import { useProfile, type Profile } from '../../renderer/src/context/ProfileContext'
+import { useProfile } from '../../renderer/src/context/ProfileContext'
 import { NOTION_AVATAR_URLS, resolveAvatarUrl } from '../../lib/notionAvatars'
 import UserAvatar from '../../renderer/src/components/UserAvatar'
 import { usePatient } from '../context/PatientContext'
+import { loadPatientProfileRemote, persistPatientProfileRemote } from '../api'
 import {
   BLOOD_GROUPS,
   COMMON_TIMEZONES,
   calculateBmi,
   bmiCategory,
   formToProfile,
-  getPatientProfile,
-  mergeProfile,
   profileToForm,
-  savePatientProfile,
   type GenderOption,
   type HeightUnit,
   type PatientProfileForm,
   type WeightUnit,
 } from '../patientProfileStorage'
+import CareLoader from '../components/CareLoader'
 import { BLUE, LIGHT_BLUE, MUTED, NAVY, TEAL, cardStyle, monoFont, sansFont } from '../ui'
 
 type ProfileTab = 'basic' | 'contact' | 'health'
@@ -67,21 +66,45 @@ const emptyForm = (): PatientProfileForm => ({
 
 export default function CareProfilePage() {
   const { profile, setProfile, hydrated } = useProfile()
-  const { patientId, selectedPatient } = usePatient()
+  const { patientId, selectedPatient, googleUser } = usePatient()
   const [form, setForm] = useState<PatientProfileForm>(emptyForm)
   const [activeTab, setActiveTab] = useState<ProfileTab>('basic')
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [loadingProfile, setLoadingProfile] = useState(true)
   const [error, setError] = useState('')
+  const [syncNote, setSyncNote] = useState('')
 
-  const loadForm = useCallback(() => {
+  const isGooglePatient =
+    !!googleUser && googleUser.patient_id === patientId
+
+  const loadForm = useCallback(async () => {
     if (!selectedPatient) return
-    const stored = getPatientProfile(patientId)
-    const merged = mergeProfile(selectedPatient, stored)
-    setForm(profileToForm(merged))
-  }, [patientId, selectedPatient])
+    setLoadingProfile(true)
+    try {
+      let loaded = await loadPatientProfileRemote(patientId, selectedPatient)
+      if (isGooglePatient && googleUser) {
+        if (!loaded.displayName?.trim()) loaded = { ...loaded, displayName: googleUser.name }
+        if (!loaded.email?.trim() && googleUser.email) loaded = { ...loaded, email: googleUser.email }
+        if (!loaded.avatarUrl && googleUser.picture) {
+          loaded = { ...loaded, avatarUrl: googleUser.picture }
+        }
+        if (!loaded.preferredName?.trim()) {
+          loaded = {
+            ...loaded,
+            preferredName: googleUser.name.trim().split(/\s+/)[0] || googleUser.name,
+          }
+        }
+      }
+      setForm(profileToForm(loaded))
+      setSyncNote('')
+    } finally {
+      setLoadingProfile(false)
+    }
+  }, [patientId, selectedPatient, isGooglePatient, googleUser])
 
   useEffect(() => {
-    loadForm()
+    void loadForm()
   }, [loadForm])
 
   const bmi = useMemo(() => {
@@ -111,9 +134,13 @@ export default function CareProfilePage() {
     )
   }
 
+  if (loadingProfile) {
+    return <CareLoader variant="full" embedded label="Loading profile…" />
+  }
+
   const patch = (updates: Partial<PatientProfileForm>) => setForm((prev) => ({ ...prev, ...updates }))
 
-  const save = () => {
+  const save = async () => {
     const trimmed = form.displayName.trim()
     if (trimmed.length < 2) {
       setError('Display name must be at least 2 characters.')
@@ -121,22 +148,34 @@ export default function CareProfilePage() {
       return
     }
 
-    const next = formToProfile({ ...form, displayName: trimmed })
-    savePatientProfile(patientId, next)
-
-    const legacyGender =
-      next.gender === 'male' || next.gender === 'female' ? next.gender : undefined
-    setProfile({
-      ...profile,
-      name: next.displayName,
-      age: next.age,
-      gender: legacyGender,
-      avatarUrl: next.avatarUrl,
-    })
-
+    setSaving(true)
     setError('')
-    setSaved(true)
-    window.setTimeout(() => setSaved(false), 2200)
+    try {
+      const next = formToProfile({ ...form, displayName: trimmed })
+      const synced = await persistPatientProfileRemote(patientId, next, {
+        scenario: selectedPatient.scenario,
+        city: form.location.trim() || selectedPatient.city,
+      })
+      setForm(profileToForm(synced))
+
+      const legacyGender =
+        synced.gender === 'male' || synced.gender === 'female' ? synced.gender : undefined
+      setProfile({
+        ...profile,
+        name: synced.displayName,
+        age: synced.age,
+        gender: legacyGender,
+        avatarUrl: synced.avatarUrl,
+      })
+
+      setSyncNote('Saved to your care record')
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 2200)
+    } catch {
+      setError('Could not save profile. Your changes are kept on this device.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const displayLabel = (form.preferredName ?? '').trim() || form.displayName.trim() || selectedPatient.name
@@ -162,7 +201,9 @@ export default function CareProfilePage() {
           Your <strong style={{ fontWeight: 600 }}>profile</strong>
         </h1>
         <p style={{ fontSize: 14, color: '#4a4a78', margin: 0, lineHeight: 1.55 }}>
-          Details for <strong>{selectedPatient.name}</strong> — stored on this device only.
+          {isGooglePatient
+            ? 'Synced with your Google account and care record — edit and save anytime.'
+            : `Details for ${selectedPatient.name} — saved to your care record when online.`}
         </p>
       </motion.header>
 
@@ -183,7 +224,14 @@ export default function CareProfilePage() {
             (form.preferredName ?? '').trim() !== form.displayName.trim() ? (
               <p style={{ fontSize: 12, color: MUTED, margin: '0 0 6px' }}>{form.displayName}</p>
             ) : null}
-            <p style={sidebarMetaStyle}>Patient profile</p>
+            {form.email ? (
+              <p style={{ fontSize: 13, color: '#4a4a78', margin: '0 0 8px', wordBreak: 'break-all' }}>
+                {form.email}
+              </p>
+            ) : null}
+            {/* <p style={sidebarMetaStyle}>
+              {isGooglePatient ? 'Signed in with Google' : 'Patient profile'}
+            </p> */}
           </div>
 
           <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -231,7 +279,11 @@ export default function CareProfilePage() {
           <div className="care-profile-tab-panel" role="tabpanel">
             {activeTab === 'basic' && (
               <>
-                <p className="care-profile-tab-intro">Identity, contact details, and avatar for this patient.</p>
+                <p className="care-profile-tab-intro">
+                  {isGooglePatient
+                    ? 'Name, email, and photo came from Google — you can still change them here.'
+                    : 'Identity, contact details, and avatar for this patient.'}
+                </p>
                 <div className="care-profile-grid">
                   <Field label="Display name">
                     <input
@@ -319,6 +371,11 @@ export default function CareProfilePage() {
                       placeholder="you@example.com"
                       style={inputStyle}
                     />
+                    {isGooglePatient && googleUser?.email ? (
+                      <p style={{ margin: '6px 0 0', fontSize: 11, color: TEAL, fontFamily: monoFont }}>
+                        Prefill from Google
+                      </p>
+                    ) : null}
                   </Field>
                   <Field label="Location">
                     <input
@@ -343,6 +400,21 @@ export default function CareProfilePage() {
                   </Field>
                   <Field label="Avatar" span={2}>
                     <div className="care-profile-avatars">
+                      {googleUser?.picture ? (
+                        <button
+                          type="button"
+                          onClick={() => patch({ avatarUrl: googleUser.picture })}
+                          title="Google photo"
+                          className={`care-profile-avatar-btn${
+                            form.avatarUrl === googleUser.picture
+                              ? ' care-profile-avatar-btn--selected'
+                              : ''
+                          }`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={googleUser.picture} alt="Google" width={44} height={44} />
+                        </button>
+                      ) : null}
                       {NOTION_AVATAR_URLS.map((url, i) => {
                         const selected = form.avatarUrl === url
                         return (
@@ -359,20 +431,31 @@ export default function CareProfilePage() {
                         )
                       })}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        patch({
-                          avatarUrl: resolveAvatarUrl(
-                            form.displayName.trim() || selectedPatient.name,
-                            undefined,
-                          ),
-                        })
-                      }
-                      style={textBtnStyle}
-                    >
-                      Reset to default for name
-                    </button>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
+                      {googleUser?.picture ? (
+                        <button
+                          type="button"
+                          onClick={() => patch({ avatarUrl: googleUser.picture })}
+                          style={textBtnStyle}
+                        >
+                          Use Google photo
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          patch({
+                            avatarUrl: resolveAvatarUrl(
+                              form.displayName.trim() || selectedPatient.name,
+                              undefined,
+                            ),
+                          })
+                        }
+                        style={textBtnStyle}
+                      >
+                        Reset to default for name
+                      </button>
+                    </div>
                   </Field>
                 </div>
               </>
@@ -608,19 +691,24 @@ export default function CareProfilePage() {
           <div className="care-profile-footer">
             {error ? <p className="care-profile-error">{error}</p> : null}
             <div className="care-profile-footer-row">
-              <button type="button" onClick={save} style={saveBtnStyle}>
-                Save profile
+              <button
+                type="button"
+                onClick={() => void save()}
+                disabled={saving}
+                style={{ ...saveBtnStyle, opacity: saving ? 0.6 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
+              >
+                {saving ? 'Saving…' : 'Save profile'}
               </button>
               {saved && (
                 <span className="care-profile-saved">
                   <Check size={16} />
-                  Saved for {selectedPatient.name.split(' ')[0]}
+                  {syncNote || `Saved for ${selectedPatient.name.split(' ')[0]}`}
                 </span>
               )}
             </div>
             <p className="care-profile-footnote">
-              Each demo patient has their own profile on this device. Switch profiles in the sidebar to
-              edit another person&apos;s details.
+              Profile is stored in your care record when the API is reachable, and cached on this
+              device as a fallback.
             </p>
           </div>
         </motion.div>
@@ -938,7 +1026,7 @@ const inputStyle: React.CSSProperties = {
 }
 
 const textBtnStyle: React.CSSProperties = {
-  marginTop: 10,
+  marginTop: 0,
   background: 'none',
   border: 'none',
   padding: 0,
@@ -962,4 +1050,5 @@ const saveBtnStyle: React.CSSProperties = {
   letterSpacing: '0.12em',
   textTransform: 'uppercase',
   cursor: 'pointer',
+  opacity: 1,
 }

@@ -3,7 +3,9 @@
 import type { Booking } from '../types'
 import SectionLabel from '../../renderer/src/components/ui/SectionLabel'
 import StatusPill from '../../renderer/src/components/ui/StatusPill'
+import EmptyState from './EmptyState'
 import { cardStyle, formatSlot, MUTED, NAVY, TEAL, monoFont } from '../ui'
+import { CalendarCheck } from 'lucide-react'
 
 const BOOKING_COLOR: Record<Booking['status'], string> = {
   requested: '#cc8a00',
@@ -19,6 +21,13 @@ export default function BookingsCard({ bookings }: { bookings: Booking[] }) {
       <p style={{ fontSize: 13, color: MUTED, margin: '0 0 16px', lineHeight: 1.55 }}>
         Lab appointments NaniAi requested on your behalf.
       </p>
+      {!bookings.length ? (
+        <EmptyState
+          icon={<CalendarCheck size={26} strokeWidth={1.75} />}
+          title="No bookings yet"
+          body="When NaniAi sends a booking request, status and slot holds will show here."
+        />
+      ) : (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {bookings.map((b) => (
           <div
@@ -47,6 +56,7 @@ export default function BookingsCard({ bookings }: { bookings: Booking[] }) {
           </div>
         ))}
       </div>
+      )}
     </section>
   )
 }

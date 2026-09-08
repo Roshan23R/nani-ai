@@ -35,7 +35,7 @@ app = FastAPI(title="Nani AI", docs_url="/api/docs", redoc_url=None)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -83,6 +83,68 @@ class ConfirmBody(BaseModel):
     tests: list[ConfirmTest]
 
 
+class EmergencyContactBody(BaseModel):
+    name: str = ""
+    phone: str = ""
+    relationship: str = ""
+
+
+class CareProfileBody(BaseModel):
+    """Rich care-profile fields — camelCase to match the UI localStorage shape."""
+
+    displayName: str = ""
+    age: int | None = None
+    gender: str | None = None
+    avatarUrl: str | None = None
+    dateOfBirth: str | None = None
+    preferredName: str | None = None
+    pronouns: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    location: str | None = None
+    timezone: str | None = None
+    emergencyContact: EmergencyContactBody | None = None
+    heightCm: float | None = None
+    weightKg: float | None = None
+    heightUnit: str = "cm"
+    weightUnit: str = "kg"
+    bloodGroup: str | None = None
+    bloodPressureSystolic: int | None = None
+    bloodPressureDiastolic: int | None = None
+    restingHeartRate: int | None = None
+    bodyTemperatureC: float | None = None
+    spo2: int | None = None
+    respiratoryRate: int | None = None
+    waistCircumferenceCm: float | None = None
+    updatedAt: str | None = None
+
+
+class PatientProfileBody(BaseModel):
+    """Full patient record stored at PK=PATIENT#{id} SK=PROFILE."""
+
+    name: str = ""
+    city: str = ""
+    scenario: str = ""
+    email: str | None = None
+    avatar_url: str | None = None
+    care: CareProfileBody | None = None
+
+
+def _public_patient(row: dict) -> dict:
+    """Normalize a Dynamo PROFILE row for the API."""
+    care = row.get("care") if isinstance(row.get("care"), dict) else {}
+    return {
+        "patient_id": row.get("patient_id"),
+        "name": row.get("name") or care.get("displayName") or "",
+        "city": row.get("city") or care.get("location") or "",
+        "scenario": row.get("scenario") or "",
+        "email": row.get("email") or care.get("email"),
+        "avatar_url": row.get("avatar_url") or care.get("avatarUrl"),
+        "care": care or None,
+        "updated_at": row.get("updated_at") or care.get("updatedAt"),
+    }
+
+
 # --- endpoints -------------------------------------------------------------
 
 @app.get("/api/health")
@@ -92,12 +154,89 @@ def health() -> dict[str, Any]:
 
 @app.get("/api/patients")
 def list_patients():
-    return store.list_patients()
+    rows = store.list_patients()
+    patients = []
+    for r in rows:
+        pub = _public_patient(r)
+        # List shape stays contract-compatible for the picker.
+        patients.append(
+            {
+                "patient_id": pub["patient_id"],
+                "name": pub["name"],
+                "city": pub["city"],
+                "scenario": pub["scenario"] or "",
+            }
+        )
+    return {"patients": patients}
+
+
+@app.get("/api/patients/{patient_id}")
+def get_patient(patient_id: str):
+    row = store.get_patient(patient_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    return _public_patient(row)
+
+
+@app.put("/api/patients/{patient_id}")
+def put_patient(patient_id: str, body: PatientProfileBody):
+    """Create or replace the patient PROFILE row (Google connect + profile save)."""
+    existing = store.get_patient(patient_id) or {}
+    care_dict: dict[str, Any] = {}
+    if isinstance(existing.get("care"), dict):
+        care_dict.update(existing["care"])
+    if body.care is not None:
+        # Full save from the profile page replaces care fields it sends.
+        incoming = body.care.model_dump(exclude_none=False)
+        care_dict.update(incoming)
+
+    name = (body.name or care_dict.get("displayName") or existing.get("name") or "").strip()
+    email = body.email if body.email is not None else (care_dict.get("email") or existing.get("email"))
+    avatar = (
+        body.avatar_url
+        if body.avatar_url is not None
+        else (care_dict.get("avatarUrl") or existing.get("avatar_url"))
+    )
+    city = body.city or care_dict.get("location") or existing.get("city") or ""
+    scenario = body.scenario or existing.get("scenario") or ""
+
+    if not care_dict.get("displayName") and name:
+        care_dict["displayName"] = name
+    if email and not care_dict.get("email"):
+        care_dict["email"] = email
+    if avatar and not care_dict.get("avatarUrl"):
+        care_dict["avatarUrl"] = avatar
+    if not care_dict.get("heightUnit"):
+        care_dict["heightUnit"] = "cm"
+    if not care_dict.get("weightUnit"):
+        care_dict["weightUnit"] = "kg"
+
+    care_dict["updatedAt"] = store.now_iso()
+    record = {
+        "patient_id": patient_id,
+        "name": name or patient_id,
+        "city": city,
+        "scenario": scenario,
+        "email": email,
+        "avatar_url": avatar,
+        "care": care_dict,
+        "updated_at": care_dict["updatedAt"],
+    }
+    store.put_patient(record)
+    return _public_patient(record)
+
+
+@app.patch("/api/patients/{patient_id}")
+def patch_patient(patient_id: str, body: PatientProfileBody):
+    """Partial update — same merge semantics as PUT for this demo."""
+    if store.get_patient(patient_id) is None:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    return put_patient(patient_id, body)
 
 
 @app.get("/api/episodes")
 def list_episodes(patient_id: str):
-    return store.list_episodes(patient_id)
+    return {"episodes": store.list_episodes(patient_id)}
 
 
 @app.post("/api/episodes", status_code=201)

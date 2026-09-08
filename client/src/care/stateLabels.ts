@@ -70,7 +70,7 @@ export const STATE_HINTS: Record<EpisodeState, string> = {
   CONSULT_REQUESTED: 'A follow-up consultation was requested based on your results.',
   NORMAL: 'Everything looks stable. No follow-up needed for this episode.',
   CLOSED: 'This care episode is complete.',
-  NEEDS_HUMAN: 'Something needs your input before NaniAi can continue.',
+  NEEDS_HUMAN: 'NaniAi could not continue — review the message and retry or re-upload.',
 }
 
 export function stateHint(state: EpisodeState): string {

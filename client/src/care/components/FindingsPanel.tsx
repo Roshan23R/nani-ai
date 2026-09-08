@@ -41,7 +41,7 @@ export default function FindingsPanel({ analysis }: { analysis: Analysis }) {
           {sev.label}
         </p>
       </div>
-      {analysis.findings.length > 0 && (
+      {analysis.findings.length > 0 ? (
         <ul style={{ margin: '0 0 20px', paddingLeft: 18, color: '#4a4a78', fontSize: 14, lineHeight: 1.6 }}>
           {analysis.findings.map((finding) => (
             <li key={finding}>
@@ -49,6 +49,10 @@ export default function FindingsPanel({ analysis }: { analysis: Analysis }) {
             </li>
           ))}
         </ul>
+      ) : (
+        <p style={{ fontSize: 14, color: MUTED, margin: '0 0 20px', lineHeight: 1.55 }}>
+          No discrete findings listed — see the summary below.
+        </p>
       )}
       <p
         style={{

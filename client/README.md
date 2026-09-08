@@ -49,6 +49,7 @@ npm run dev
 | --- | --- | --- |
 | `NEXT_PUBLIC_USE_MOCKS` | `true` | Uses the in-memory/mock Care Episode API |
 | `NEXT_PUBLIC_API_BASE_URL` | empty | Backend base URL when mocks are disabled |
+| `NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID` | empty | Google Identity Services client ID for launch sign-in |
 
 ## Main routes
 

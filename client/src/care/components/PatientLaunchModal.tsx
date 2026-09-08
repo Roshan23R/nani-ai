@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useId } from 'react'
+import { useCallback, useEffect, useId } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import GoogleSignInButton from './GoogleSignInButton'
 import { LIGHT_BLUE, NAVY, TEAL, monoFont, sansFont } from '../ui'
 import { signInWithGoogle } from '../api'
 import { usePatient } from '../context/PatientContext'
+import { profileFromName, useProfile } from '../../renderer/src/context/ProfileContext'
 import NaniLogo from '../../renderer/src/components/NaniLogo'
 
 type PatientLaunchModalProps = {
@@ -17,6 +18,7 @@ type PatientLaunchModalProps = {
 export default function PatientLaunchModal({ open, onClose, onLaunch }: PatientLaunchModalProps) {
   const titleId = useId()
   const { setGooglePatient } = usePatient()
+  const { profile, setProfile } = useProfile()
 
   useEffect(() => {
     if (!open) return
@@ -27,11 +29,19 @@ export default function PatientLaunchModal({ open, onClose, onLaunch }: PatientL
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  const handleCredential = async (credential: string) => {
-    const user = await signInWithGoogle(credential)
-    setGooglePatient(user)
-    onLaunch()
-  }
+  const handleCredential = useCallback(
+    async (credential: string) => {
+      const user = await signInWithGoogle(credential)
+      setGooglePatient(user)
+      const next = profileFromName(user.name, profile)
+      setProfile({
+        ...next,
+        avatarUrl: user.picture || next.avatarUrl,
+      })
+      onLaunch()
+    },
+    [onLaunch, profile, setGooglePatient, setProfile],
+  )
 
   return (
     <AnimatePresence>
@@ -90,7 +100,7 @@ export default function PatientLaunchModal({ open, onClose, onLaunch }: PatientL
                 Continue with <strong style={{ fontWeight: 600 }}>Google</strong>
               </h2>
               <p style={{ fontSize: 14, lineHeight: 1.55, color: '#4a4a78', margin: 0 }}>
-                Your verified Google email identifies your care record, and your Google profile name is used in the app.
+                We&apos;ll prefill your profile with your Google name, email, and photo.
               </p>
             </div>
 

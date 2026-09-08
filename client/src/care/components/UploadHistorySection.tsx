@@ -35,7 +35,11 @@ export default function UploadHistorySection({
       {loading ? (
         <CareLoader variant="block" label="Loading episodes…" minHeight={160} />
       ) : episodes.length === 0 ? (
-        <DashboardEmpty text="No uploads yet." />
+        <DashboardEmpty
+          text="No uploads yet — start with a prescription photo or PDF."
+          cta="Upload episode →"
+          ctaHref="#upload-episode"
+        />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {episodes.map((ep, i) => (

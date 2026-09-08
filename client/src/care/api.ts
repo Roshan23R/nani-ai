@@ -1,6 +1,14 @@
 import type { Episode, EpisodeSummary, Patient } from './types'
 import { buildMockEpisode, DEMO_EPISODE_ID, PATIENT_ID } from './mockEpisodes'
 import { DEFAULT_PATIENT_ID, MOCK_PATIENTS } from './patients'
+import {
+  getPatientProfile,
+  localToRemotePayload,
+  mergeProfile,
+  remoteToLocalProfile,
+  savePatientProfile,
+  type PatientLocalProfile,
+} from './patientProfileStorage'
 
 const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== 'false'
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? ''
@@ -13,6 +21,32 @@ export type GoogleUser = {
   email: string
   name: string
   google_sub: string
+  /** Google profile photo URL from the ID token `picture` claim. */
+  picture?: string
+}
+
+/** Decode a Google Identity Services ID token in the browser — no backend auth yet. */
+export function decodeGoogleCredential(credential: string): GoogleUser {
+  const parts = credential.split('.')
+  if (parts.length < 2) throw new Error('Invalid Google credential')
+  const json = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+  const payload = JSON.parse(json) as {
+    sub?: string
+    email?: string
+    name?: string
+    given_name?: string
+    picture?: string
+  }
+  if (!payload.sub) throw new Error('Google credential missing subject')
+  const email = payload.email ?? ''
+  const name = payload.name || payload.given_name || email || 'Google user'
+  return {
+    patient_id: `google_${payload.sub}`,
+    email,
+    name,
+    google_sub: payload.sub,
+    picture: payload.picture || undefined,
+  }
 }
 
 function uploadName(ep: Episode): string | undefined {
@@ -71,20 +105,111 @@ async function liveFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+async function liveFetchMaybe<T>(path: string, init?: RequestInit): Promise<T | null> {
+  const res = await fetch(`${API_BASE}${path}`, init)
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(await res.text())
+  return res.json() as Promise<T>
+}
+
+/** Remote patient PROFILE document from GET/PUT /api/patients/{id}. */
+export type RemotePatientProfile = {
+  patient_id: string
+  name: string
+  city: string
+  scenario: string
+  email?: string | null
+  avatar_url?: string | null
+  care?: Record<string, unknown> | null
+  updated_at?: string | null
+}
+
+export type UpsertPatientPayload = {
+  name?: string
+  city?: string
+  scenario?: string
+  email?: string | null
+  avatar_url?: string | null
+  care?: PatientLocalProfile | Record<string, unknown> | null
+}
+
+export async function fetchPatientProfile(patientId: string): Promise<RemotePatientProfile | null> {
+  if (USE_MOCKS) return null
+  try {
+    return await liveFetchMaybe<RemotePatientProfile>(
+      `/api/patients/${encodeURIComponent(patientId)}`,
+    )
+  } catch {
+    return null
+  }
+}
+
+export async function upsertPatientProfile(
+  patientId: string,
+  payload: UpsertPatientPayload,
+): Promise<RemotePatientProfile | null> {
+  if (USE_MOCKS) return null
+  try {
+    return await liveFetch<RemotePatientProfile>(`/api/patients/${encodeURIComponent(patientId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Load profile: remote first, then localStorage cache, then defaults.
+ * Refreshes the local cache when remote succeeds.
+ */
+export async function loadPatientProfileRemote(
+  patientId: string,
+  patient: Patient,
+): Promise<PatientLocalProfile> {
+  const remote = await fetchPatientProfile(patientId)
+  if (remote) {
+    const local = remoteToLocalProfile(remote, patient.name)
+    savePatientProfile(patientId, local)
+    return local
+  }
+  return mergeProfile(patient, getPatientProfile(patientId))
+}
+
+/** Save to localStorage and best-effort PUT to the API. */
+export async function persistPatientProfileRemote(
+  patientId: string,
+  profile: PatientLocalProfile,
+  extras?: { scenario?: string; city?: string },
+): Promise<PatientLocalProfile> {
+  const withStamp = { ...profile, updatedAt: new Date().toISOString() }
+  savePatientProfile(patientId, withStamp)
+  const remote = await upsertPatientProfile(patientId, localToRemotePayload(withStamp, extras))
+  if (remote) {
+    const synced = remoteToLocalProfile(remote, withStamp.displayName)
+    savePatientProfile(patientId, synced)
+    return synced
+  }
+  return withStamp
+}
+
 export async function signInWithGoogle(credential: string): Promise<GoogleUser> {
+  // Backend has no /api/auth/google yet — identity is established in the UI only.
   if (USE_MOCKS) {
-    return {
-      patient_id: 'demo-patient-01',
-      email: 'demo-patient-01@example.com',
-      name: 'Shashank Shekhar',
-      google_sub: 'mock-google-subject',
+    try {
+      return decodeGoogleCredential(credential)
+    } catch {
+      return {
+        patient_id: 'demo-patient-01',
+        email: 'demo-patient-01@example.com',
+        name: 'Shashank Shekhar',
+        google_sub: 'mock-google-subject',
+        picture: undefined,
+      }
     }
   }
-  return liveFetch<GoogleUser>('/api/auth/google', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ credential }),
-  })
+  return decodeGoogleCredential(credential)
 }
 
 /** Best-effort device coords for lab search; null on deny, timeout, or unsupported. */

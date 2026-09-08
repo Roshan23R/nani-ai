@@ -11,6 +11,7 @@ const stateByFile: Record<(typeof MOCK_FILE_NAMES)[number], Episode['state']> = 
   '07-normal.json': 'NORMAL',
   '08-needs-human.json': 'NEEDS_HUMAN',
   '09-closed.json': 'CLOSED',
+  '10-awaiting-confirmation.json': 'AWAITING_CONFIRMATION',
 }
 
 export async function loadMockFromFile(fileName: (typeof MOCK_FILE_NAMES)[number]): Promise<Episode> {

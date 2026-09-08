@@ -1,4 +1,4 @@
-import type { Episode, EpisodeSummary, Patient } from './types'
+import type { ConfirmationTest, Episode, EpisodeSummary, Patient } from './types'
 import { buildMockEpisode, DEMO_EPISODE_ID, PATIENT_ID } from './mockEpisodes'
 import { DEFAULT_PATIENT_ID, MOCK_PATIENTS } from './patients'
 import {
@@ -273,8 +273,7 @@ export async function createEpisode(
     store.set(episodeId, ep)
     if (patientId === PATIENT_ID) list = [toSummary(ep), ...list]
     setTimeout(() => advanceMock(episodeId, 'TESTS_IDENTIFIED'), 1200)
-    setTimeout(() => advanceMock(episodeId, 'LABS_SHORTLISTED'), 2400)
-    setTimeout(() => advanceMock(episodeId, 'BOOKING_REQUESTED'), 3600)
+    setTimeout(() => advanceMock(episodeId, 'AWAITING_CONFIRMATION'), 2400)
     return structuredClone(ep)
   }
   const body = new FormData()
@@ -286,6 +285,84 @@ export async function createEpisode(
     body.append('lng', String(coords.lng))
   }
   return liveFetch<Episode>('/api/episodes', { method: 'POST', body })
+}
+
+export async function confirmEpisode(
+  episodeId: string,
+  tests: ConfirmationTest[],
+): Promise<Episode> {
+  if (USE_MOCKS) {
+    initStore()
+    const current = store.get(episodeId)
+    if (!current || current.state !== 'AWAITING_CONFIRMATION') {
+      throw new Error('Episode is not awaiting confirmation')
+    }
+    const kept = tests.filter((t) => t.keep !== false)
+    if (!kept.length) throw new Error('At least one test must be kept')
+    const extracted = current.confirmation?.extracted_tests ?? current.prescription?.tests ?? []
+    const edits = countConfirmEdits(extracted, tests)
+    const next = buildMockEpisode('LABS_SHORTLISTED', episodeId)
+    next.prescription = {
+      ...(current.prescription ?? next.prescription!),
+      tests: kept.map(({ test_code, display_name, urgency }) => ({
+        test_code,
+        display_name,
+        urgency,
+      })),
+      source_file_url: current.prescription?.source_file_url ?? next.prescription?.source_file_url,
+    }
+    next.confirmation = {
+      required: true,
+      confirmed_at: new Date().toISOString(),
+      extracted_tests: extracted,
+      confirmed_tests: next.prescription.tests,
+      edits_made: edits,
+    }
+    const removed = extracted.length - kept.length
+    next.timeline = [
+      ...current.timeline.filter((t) => t.action !== 'confirmed_tests'),
+      {
+        at: new Date().toISOString(),
+        actor: 'patient',
+        action: 'confirmed_tests',
+        detail: `${kept.length} of ${extracted.length} tests confirmed${
+          removed ? `, ${removed} removed` : ''
+        }`,
+      },
+      ...next.timeline.filter(
+        (t) => t.action === 'found_labs' || t.action === 'selected_lab',
+      ),
+    ]
+    next.summary_line = 'Nearby labs found — one selected'
+    store.set(episodeId, next)
+    syncList(next)
+    setTimeout(() => advanceMock(episodeId, 'BOOKING_REQUESTED'), 1500)
+    setTimeout(() => advanceMock(episodeId, 'AWAITING_REPORT'), 3000)
+    return structuredClone(next)
+  }
+  return liveFetch<Episode>(`/api/episodes/${episodeId}/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tests }),
+  })
+}
+
+function countConfirmEdits(
+  extracted: { test_code: string; display_name: string; urgency: string }[],
+  submitted: ConfirmationTest[],
+): number {
+  const byCode = new Map(extracted.map((t) => [t.test_code, t]))
+  let edits = 0
+  for (const t of submitted) {
+    const orig = byCode.get(t.test_code)
+    if (!orig) {
+      edits += 1
+      continue
+    }
+    if (t.keep === false) edits += 1
+    else if (t.display_name !== orig.display_name || t.urgency !== orig.urgency) edits += 1
+  }
+  return edits
 }
 
 export async function uploadReport(episodeId: string, file: File): Promise<Episode> {
@@ -329,7 +406,15 @@ export function setMockEpisodeState(episodeId: string, state: Episode['state']):
 
 function advanceMock(episodeId: string, state: Episode['state']) {
   const current = store.get(episodeId)
-  if (!current || current.state === 'NEEDS_HUMAN' || current.state === 'CLOSED' || current.state === 'NORMAL') return
+  if (
+    !current ||
+    current.state === 'NEEDS_HUMAN' ||
+    current.state === 'CLOSED' ||
+    current.state === 'NORMAL' ||
+    current.state === 'AWAITING_CONFIRMATION'
+  ) {
+    return
+  }
   const ep = buildMockEpisode(state, episodeId)
   store.set(episodeId, ep)
   syncList(ep)

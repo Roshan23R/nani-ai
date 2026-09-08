@@ -39,7 +39,7 @@ const JOURNEY = [
     label: 'Prescription',
     detail: 'Read tests & urgency',
     icon: ClipboardList,
-    states: ['PRESCRIPTION_RECEIVED', 'TESTS_IDENTIFIED'] as EpisodeState[],
+    states: ['PRESCRIPTION_RECEIVED', 'TESTS_IDENTIFIED', 'AWAITING_CONFIRMATION'] as EpisodeState[],
   },
   {
     key: 'lab',
@@ -130,7 +130,11 @@ export default function CareDashboardPage() {
   const needsAttention = useMemo(
     () =>
       episodes.filter(
-        (e) => e.state === 'NEEDS_HUMAN' || e.state === 'AWAITING_REPORT' || e.state === 'ANOMALY_FOUND',
+        (e) =>
+          e.state === 'NEEDS_HUMAN' ||
+          e.state === 'AWAITING_REPORT' ||
+          e.state === 'AWAITING_CONFIRMATION' ||
+          e.state === 'ANOMALY_FOUND',
       ),
     [episodes],
   )

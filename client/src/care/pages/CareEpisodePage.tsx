@@ -18,12 +18,14 @@ import {
   LayoutGrid,
   ArrowLeft,
 } from 'lucide-react'
-import { getEpisode, retryEpisode, uploadReport } from '../api'
-import { CARE_EPISODES } from '../routes'
+import { useRouter } from 'next/navigation'
+import { confirmEpisode, getEpisode, retryEpisode, uploadReport } from '../api'
+import { CARE_EPISODES, CARE_HOME } from '../routes'
 import { isTerminal, stateColor } from '../stateLabels'
-import type { Episode, EpisodeState } from '../types'
+import type { ConfirmationTest, Episode, EpisodeState } from '../types'
 import BookingsCard from '../components/BookingsCard'
 import ConsultationCard from '../components/ConsultationCard'
+import ConfirmationPanel from '../components/ConfirmationPanel'
 import EpisodeTimeline from '../components/EpisodeTimeline'
 import ErrorPanel from '../components/ErrorPanel'
 import FindingsPanel from '../components/FindingsPanel'
@@ -75,6 +77,8 @@ function defaultPanel(state: EpisodeState, available: PanelId[]): PanelId {
       case 'PRESCRIPTION_RECEIVED':
       case 'TESTS_IDENTIFIED':
         return ['prescription', 'timeline']
+      case 'AWAITING_CONFIRMATION':
+        return ['overview', 'prescription', 'timeline']
       case 'LABS_SHORTLISTED':
         return ['labs', 'prescription']
       case 'BOOKING_REQUESTED':
@@ -101,7 +105,9 @@ function defaultPanel(state: EpisodeState, available: PanelId[]): PanelId {
 }
 
 function journeyStep(state: EpisodeState): number {
-  if (['PRESCRIPTION_RECEIVED', 'TESTS_IDENTIFIED'].includes(state)) return 0
+  if (['PRESCRIPTION_RECEIVED', 'TESTS_IDENTIFIED', 'AWAITING_CONFIRMATION'].includes(state)) {
+    return 0
+  }
   if (['LABS_SHORTLISTED', 'BOOKING_REQUESTED'].includes(state)) return 1
   if (state === 'AWAITING_REPORT') return 2
   if (
@@ -129,8 +135,10 @@ export default function CareEpisodePage({
   const [reportOpen, setReportOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [retrying, setRetrying] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [panel, setPanel] = useState<PanelId>('overview')
   const [userPickedPanel, setUserPickedPanel] = useState(false)
+  const router = useRouter()
 
   const load = useCallback(async () => {
     try {
@@ -202,6 +210,20 @@ export default function CareEpisodePage({
     }
   }
 
+  const handleConfirm = async (tests: ConfirmationTest[]) => {
+    setConfirming(true)
+    try {
+      setEpisode(await confirmEpisode(episodeId, tests))
+      setUserPickedPanel(false)
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  const handleReupload = () => {
+    router.push(CARE_HOME)
+  }
+
   const selectPanel = (id: PanelId) => {
     setUserPickedPanel(true)
     setPanel(id)
@@ -232,6 +254,7 @@ export default function CareEpisodePage({
   }
 
   const showReportUpload = episode.state === 'AWAITING_REPORT'
+  const awaitingConfirmation = episode.state === 'AWAITING_CONFIRMATION'
   const reading =
     episode.state === 'PRESCRIPTION_RECEIVED' || episode.state === 'REPORT_RECEIVED'
   const anomaly = episode.state === 'ANOMALY_FOUND'
@@ -240,6 +263,8 @@ export default function CareEpisodePage({
   const step = journeyStep(episode.state)
   const activePanel = availablePanels.includes(panel) ? panel : 'overview'
   const padX = embedded ? 28 : 32
+  const extractedTests =
+    episode.confirmation?.extracted_tests ?? episode.prescription?.tests ?? []
 
   return (
     <div
@@ -305,6 +330,30 @@ export default function CareEpisodePage({
         />
       </div>
 
+      {awaitingConfirmation ? (
+        <main
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            padding: `4px ${padX}px 28px`,
+          }}
+        >
+          <div style={{ maxWidth: 1040, margin: '0 auto' }}>
+            <ConfirmationPanel
+              prescription={episode.prescription}
+              extractedTests={extractedTests}
+              submitting={confirming}
+              onConfirm={handleConfirm}
+              onReupload={handleReupload}
+            />
+            <div style={{ marginTop: 16 }}>
+              <EpisodeTimeline entries={episode.timeline} />
+            </div>
+          </div>
+        </main>
+      ) : (
+        <>
       <motion.section
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
@@ -646,6 +695,8 @@ export default function CareEpisodePage({
           </AnimatePresence>
         </div>
       </main>
+        </>
+      )}
 
       <style>{`
         @keyframes carePulse {

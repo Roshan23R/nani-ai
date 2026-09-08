@@ -5,15 +5,18 @@ export const DEMO_EPISODE_ID = 'ep_7f3a9c'
 
 const prescription: Prescription = {
   doctor: 'Dr. A. Sen',
-  date: '2026-08-20',
+  date: '2014-03-14', // deliberately wrong — never display
   diagnosis: 'Suspected iron deficiency anaemia',
+  complaint: 'Fatigue and pallor',
+  patient: 'Meera Banerjee',
   medicines: [{ name: 'Ferrous ascorbate', dose: '100mg', frequency: 'once daily' }],
   tests: [
-    { test_code: 'CBC', display_name: 'Complete blood count', urgency: 'urgent' },
+    { test_code: 'CBC', display_name: 'Hb% TC DC ESR', urgency: 'urgent' },
     { test_code: 'FERRITIN', display_name: 'Serum ferritin', urgency: 'routine' },
     { test_code: 'TSH', display_name: 'Thyroid stimulating hormone', urgency: 'routine' },
+    { test_code: 'VITD', display_name: '25 OH D', urgency: 'routine' },
   ],
-  source_file_url: 'https://storage.googleapis.com/demo/rx1.jpg',
+  source_file_url: '/mocks/rx-sample.svg',
 }
 
 const labs: Lab[] = [
@@ -63,10 +66,17 @@ function tl(at: string, actor: TimelineEntry['actor'], action: string, detail?: 
 function buildTimeline(state: EpisodeState): TimelineEntry[] {
   const all: TimelineEntry[] = [
     tl('2026-08-20T09:14:00Z', 'patient', 'uploaded_prescription', 'rx1.jpg'),
-    tl('2026-08-20T09:15:00Z', 'intake_agent', 'extracted_tests', '3 tests found, 1 marked urgent'),
-    tl('2026-08-20T09:15:00Z', 'logistics_agent', 'found_labs', '4 centres within 5km'),
-    tl('2026-08-20T09:15:30Z', 'logistics_agent', 'selected_lab', 'Suraksha Diagnostics selected'),
-    tl('2026-08-20T09:16:00Z', 'logistics_agent', 'requested_booking', 'Email sent to Suraksha Diagnostics'),
+    tl('2026-08-20T09:15:00Z', 'intake_agent', 'extracted_tests', '4 tests found, confidence medium'),
+    tl(
+      '2026-08-20T09:15:20Z',
+      'intake_agent',
+      'awaiting_confirmation',
+      '4 tests read from prescription — asked patient to confirm',
+    ),
+    tl('2026-08-20T09:16:00Z', 'patient', 'confirmed_tests', '3 of 4 tests confirmed, 1 removed'),
+    tl('2026-08-20T09:16:30Z', 'logistics_agent', 'found_labs', '4 centres within 5km'),
+    tl('2026-08-20T09:16:45Z', 'logistics_agent', 'selected_lab', 'Suraksha Diagnostics selected'),
+    tl('2026-08-20T09:17:00Z', 'logistics_agent', 'requested_booking', 'Email sent to Suraksha Diagnostics'),
     tl('2026-08-24T10:58:00Z', 'patient', 'uploaded_report', 'report1.pdf'),
     tl('2026-08-24T11:00:00Z', 'diagnostics_agent', 'compared_history', '3 prior reports found'),
     tl('2026-08-24T11:01:00Z', 'diagnostics_agent', 'flagged_anomaly', 'Haemoglobin falling, now below range'),
@@ -76,16 +86,17 @@ function buildTimeline(state: EpisodeState): TimelineEntry[] {
   const cut: Record<EpisodeState, number> = {
     PRESCRIPTION_RECEIVED: 1,
     TESTS_IDENTIFIED: 2,
-    LABS_SHORTLISTED: 4,
-    BOOKING_REQUESTED: 5,
-    AWAITING_REPORT: 5,
-    REPORT_RECEIVED: 6,
-    TRENDS_ANALYZED: 7,
-    ANOMALY_FOUND: 8,
-    CONSULT_REQUESTED: 9,
-    NORMAL: 7,
-    CLOSED: 9,
-    NEEDS_HUMAN: 5,
+    AWAITING_CONFIRMATION: 3,
+    LABS_SHORTLISTED: 6,
+    BOOKING_REQUESTED: 7,
+    AWAITING_REPORT: 7,
+    REPORT_RECEIVED: 8,
+    TRENDS_ANALYZED: 9,
+    ANOMALY_FOUND: 10,
+    CONSULT_REQUESTED: 11,
+    NORMAL: 9,
+    CLOSED: 11,
+    NEEDS_HUMAN: 7,
   }
   return all.slice(0, cut[state])
 }
@@ -93,7 +104,8 @@ function buildTimeline(state: EpisodeState): TimelineEntry[] {
 function summary(state: EpisodeState): string {
   const map: Record<EpisodeState, string> = {
     PRESCRIPTION_RECEIVED: 'Prescription uploaded — reading in progress',
-    TESTS_IDENTIFIED: '3 tests identified on your prescription',
+    TESTS_IDENTIFIED: '4 tests identified on your prescription',
+    AWAITING_CONFIRMATION: 'Confirm what we read',
     LABS_SHORTLISTED: '4 nearby labs found — one selected',
     BOOKING_REQUESTED: 'Booking request sent — awaiting lab reply',
     AWAITING_REPORT: 'Waiting for lab results',
@@ -110,12 +122,86 @@ function summary(state: EpisodeState): string {
 
 export function buildMockEpisode(state: EpisodeState, episodeId = DEMO_EPISODE_ID): Episode {
   const hasPrescription = state !== 'PRESCRIPTION_RECEIVED'
-  const hasLabs = ['LABS_SHORTLISTED', 'BOOKING_REQUESTED', 'AWAITING_REPORT', 'NEEDS_HUMAN', 'REPORT_RECEIVED', 'TRENDS_ANALYZED', 'ANOMALY_FOUND', 'CONSULT_REQUESTED', 'NORMAL', 'CLOSED'].includes(state)
-  const hasBookings = ['BOOKING_REQUESTED', 'AWAITING_REPORT', 'REPORT_RECEIVED', 'TRENDS_ANALYZED', 'ANOMALY_FOUND', 'CONSULT_REQUESTED', 'NORMAL', 'CLOSED'].includes(state)
-  const hasReport = ['REPORT_RECEIVED', 'TRENDS_ANALYZED', 'ANOMALY_FOUND', 'CONSULT_REQUESTED', 'NORMAL', 'CLOSED'].includes(state)
-  const hasAnalysis = ['TRENDS_ANALYZED', 'ANOMALY_FOUND', 'CONSULT_REQUESTED', 'NORMAL', 'CLOSED'].includes(state)
-  const hasConsult = ['CONSULT_REQUESTED', 'CLOSED'].includes(state) ||
+  const awaitingConfirm = state === 'AWAITING_CONFIRMATION'
+  const pastConfirm = ![
+    'PRESCRIPTION_RECEIVED',
+    'TESTS_IDENTIFIED',
+    'AWAITING_CONFIRMATION',
+  ].includes(state)
+  const hasLabs = [
+    'LABS_SHORTLISTED',
+    'BOOKING_REQUESTED',
+    'AWAITING_REPORT',
+    'NEEDS_HUMAN',
+    'REPORT_RECEIVED',
+    'TRENDS_ANALYZED',
+    'ANOMALY_FOUND',
+    'CONSULT_REQUESTED',
+    'NORMAL',
+    'CLOSED',
+  ].includes(state)
+  const hasBookings = [
+    'BOOKING_REQUESTED',
+    'AWAITING_REPORT',
+    'REPORT_RECEIVED',
+    'TRENDS_ANALYZED',
+    'ANOMALY_FOUND',
+    'CONSULT_REQUESTED',
+    'NORMAL',
+    'CLOSED',
+  ].includes(state)
+  const hasReport = [
+    'REPORT_RECEIVED',
+    'TRENDS_ANALYZED',
+    'ANOMALY_FOUND',
+    'CONSULT_REQUESTED',
+    'NORMAL',
+    'CLOSED',
+  ].includes(state)
+  const hasAnalysis = [
+    'TRENDS_ANALYZED',
+    'ANOMALY_FOUND',
+    'CONSULT_REQUESTED',
+    'NORMAL',
+    'CLOSED',
+  ].includes(state)
+  const hasConsult =
+    ['CONSULT_REQUESTED', 'CLOSED'].includes(state) ||
     (state === 'TRENDS_ANALYZED' && false) // consult only when consult_needed
+
+  const extracted = prescription.tests
+  const confirmedTests = pastConfirm
+    ? extracted.filter((t) => t.test_code !== 'VITD')
+    : null
+  const rxTests = pastConfirm ? confirmedTests! : extracted
+  const rx = hasPrescription ? { ...prescription, tests: rxTests } : null
+
+  const confirmation =
+    state === 'PRESCRIPTION_RECEIVED'
+      ? null
+      : state === 'TESTS_IDENTIFIED'
+        ? {
+            required: true,
+            confirmed_at: null,
+            extracted_tests: extracted,
+            confirmed_tests: null,
+            edits_made: null,
+          }
+        : awaitingConfirm
+          ? {
+              required: true,
+              confirmed_at: null,
+              extracted_tests: extracted,
+              confirmed_tests: null,
+              edits_made: null,
+            }
+          : {
+              required: true,
+              confirmed_at: '2026-08-20T09:16:00Z',
+              extracted_tests: extracted,
+              confirmed_tests: confirmedTests,
+              edits_made: 1,
+            }
 
   const reportValues = [
     {
@@ -201,14 +287,15 @@ export function buildMockEpisode(state: EpisodeState, episodeId = DEMO_EPISODE_I
     created_at: '2026-08-20T09:14:00Z',
     updated_at: '2026-08-24T11:02:00Z',
     summary_line: summary(state),
-    prescription: hasPrescription ? prescription : null,
+    prescription: rx,
+    confirmation,
     labs: hasLabs ? (state === 'LABS_SHORTLISTED' ? labs.map((l) => ({ ...l, selected: l.place_id === 'ChIJ-suraksha' })) : labs) : [],
     bookings: hasBookings
       ? [
           {
             test_code: 'CBC',
             lab_name: 'Suraksha Diagnostics, Salt Lake',
-            requested_at: '2026-08-20T09:16:00Z',
+            requested_at: '2026-08-20T09:17:00Z',
             status: state === 'BOOKING_REQUESTED' ? 'requested' : 'confirmed',
             slot_hold: '2026-08-21T08:00:00Z',
             idempotency_key: `${episodeId}:CBC:1`,
@@ -216,7 +303,7 @@ export function buildMockEpisode(state: EpisodeState, episodeId = DEMO_EPISODE_I
           {
             test_code: 'FERRITIN',
             lab_name: 'Suraksha Diagnostics, Salt Lake',
-            requested_at: '2026-08-20T09:16:00Z',
+            requested_at: '2026-08-20T09:17:00Z',
             status: 'requested',
             slot_hold: '2026-08-21T08:00:00Z',
             idempotency_key: `${episodeId}:FERRITIN:1`,
@@ -255,6 +342,7 @@ export function buildMockEpisode(state: EpisodeState, episodeId = DEMO_EPISODE_I
 export const MOCK_STATE_CYCLE: EpisodeState[] = [
   'PRESCRIPTION_RECEIVED',
   'TESTS_IDENTIFIED',
+  'AWAITING_CONFIRMATION',
   'LABS_SHORTLISTED',
   'BOOKING_REQUESTED',
   'AWAITING_REPORT',
@@ -277,4 +365,5 @@ export const MOCK_FILE_NAMES = [
   '07-normal.json',
   '08-needs-human.json',
   '09-closed.json',
+  '10-awaiting-confirmation.json',
 ] as const

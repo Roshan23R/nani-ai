@@ -3,6 +3,7 @@ import type { EpisodeState } from './types'
 export const STATE_LABELS: Record<EpisodeState, string> = {
   PRESCRIPTION_RECEIVED: 'Reading your prescription',
   TESTS_IDENTIFIED: 'Tests identified on your prescription',
+  AWAITING_CONFIRMATION: 'Confirm what we read',
   LABS_SHORTLISTED: 'Nearby labs found',
   BOOKING_REQUESTED: 'Booking request sent — awaiting lab reply',
   AWAITING_REPORT: 'Waiting for your lab results',
@@ -18,6 +19,9 @@ export const STATE_LABELS: Record<EpisodeState, string> = {
 export const ACTION_LABELS: Record<string, string> = {
   uploaded_prescription: 'Uploaded prescription',
   extracted_tests: 'Extracted tests from prescription',
+  awaiting_confirmation: 'Asked you to confirm tests',
+  confirmed_tests: 'Confirmed tests',
+  skipped_confirmation: 'Skipped confirmation (high confidence)',
   found_labs: 'Found nearby labs',
   selected_lab: 'Selected a lab',
   requested_booking: 'Requested lab booking',
@@ -27,7 +31,13 @@ export const ACTION_LABELS: Record<string, string> = {
   requested_consultation: 'Requested follow-up consultation',
 }
 
-export const TERMINAL_STATES: EpisodeState[] = ['NORMAL', 'CLOSED', 'NEEDS_HUMAN']
+/** Stops UI polling. AWAITING_CONFIRMATION waits for the patient — not a final outcome. */
+export const TERMINAL_STATES: EpisodeState[] = [
+  'NORMAL',
+  'CLOSED',
+  'NEEDS_HUMAN',
+  'AWAITING_CONFIRMATION',
+]
 
 export function isTerminal(state: EpisodeState): boolean {
   return TERMINAL_STATES.includes(state)
@@ -41,6 +51,7 @@ export function stateLabel(state: EpisodeState): string {
 const STATE_SHORT_LABELS: Record<EpisodeState, string> = {
   PRESCRIPTION_RECEIVED: 'Reading Rx',
   TESTS_IDENTIFIED: 'Tests found',
+  AWAITING_CONFIRMATION: 'Confirm tests',
   LABS_SHORTLISTED: 'Labs found',
   BOOKING_REQUESTED: 'Booking sent',
   AWAITING_REPORT: 'Awaiting report',
@@ -61,6 +72,8 @@ export function stateShortLabel(state: EpisodeState): string {
 export const STATE_HINTS: Record<EpisodeState, string> = {
   PRESCRIPTION_RECEIVED: 'NaniAi is reading your prescription to identify tests and urgency.',
   TESTS_IDENTIFIED: 'Tests are identified. NaniAi is finding nearby labs that can run them.',
+  AWAITING_CONFIRMATION:
+    'Check the tests against your prescription. Edit or remove anything wrong before labs are booked.',
   LABS_SHORTLISTED: 'Nearby labs are shortlisted. A booking request goes out next.',
   BOOKING_REQUESTED: 'A lab booking was requested. NaniAi is waiting for confirmation.',
   AWAITING_REPORT: 'Your lab visit is booked. Upload the report when results arrive.',
@@ -79,7 +92,13 @@ export function stateHint(state: EpisodeState): string {
 
 export function stateColor(state: EpisodeState): string {
   if (state === 'NEEDS_HUMAN' || state === 'ANOMALY_FOUND') return '#c83030'
-  if (state === 'AWAITING_REPORT' || state === 'BOOKING_REQUESTED') return '#cc8a00'
+  if (
+    state === 'AWAITING_REPORT' ||
+    state === 'BOOKING_REQUESTED' ||
+    state === 'AWAITING_CONFIRMATION'
+  ) {
+    return '#cc8a00'
+  }
   if (state === 'NORMAL' || state === 'CLOSED') return '#3EC4C0'
   return '#1A1AE8'
 }

@@ -8,6 +8,7 @@ export interface Patient {
 export type EpisodeState =
   | 'PRESCRIPTION_RECEIVED'
   | 'TESTS_IDENTIFIED'
+  | 'AWAITING_CONFIRMATION'
   | 'LABS_SHORTLISTED'
   | 'BOOKING_REQUESTED'
   | 'AWAITING_REPORT'
@@ -47,11 +48,27 @@ export interface PrescriptionTest {
 
 export interface Prescription {
   doctor: string
+  /** Extracted but unreliable — never display (model misreads DD.MM.YY). */
   date: string
   diagnosis: string
   medicines: Medicine[]
   tests: PrescriptionTest[]
+  /** Optional context from extraction — read-only in the UI. */
+  complaint?: string | null
+  patient?: string | null
   source_file_url?: string
+}
+
+export interface ConfirmationTest extends PrescriptionTest {
+  keep?: boolean
+}
+
+export interface Confirmation {
+  required: boolean
+  confirmed_at: string | null
+  extracted_tests: PrescriptionTest[]
+  confirmed_tests: PrescriptionTest[] | null
+  edits_made: number | null
 }
 
 export interface Lab {
@@ -150,6 +167,8 @@ export interface Episode extends EpisodeSummary {
   patient_id: string
   updated_at: string
   prescription: Prescription | null
+  /** Null before TESTS_IDENTIFIED; present when confirmation was required or skipped. */
+  confirmation?: Confirmation | null
   labs: Lab[]
   bookings: Booking[]
   report: Report | null

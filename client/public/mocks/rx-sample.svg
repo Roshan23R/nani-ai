@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="860" viewBox="0 0 640 860">
+  <rect width="640" height="860" fill="#f7f4ee"/>
+  <rect x="28" y="28" width="584" height="804" fill="#fffdf8" stroke="#d4cfc4" stroke-width="2"/>
+  <text x="52" y="78" font-family="Georgia, serif" font-size="28" fill="#1a1a3a" font-weight="700">Dr. A. Sen</text>
+  <text x="52" y="108" font-family="ui-monospace, monospace" font-size="13" fill="#6a6a88">MBBS · Salt Lake Clinic · Kolkata</text>
+  <line x1="52" y1="128" x2="588" y2="128" stroke="#e6e0d6" stroke-width="1.5"/>
+  <text x="52" y="168" font-family="ui-monospace, monospace" font-size="12" fill="#8a8aa0" letter-spacing="0.08em">Rx</text>
+  <text x="52" y="210" font-family="Georgia, serif" font-size="20" fill="#2a2a4a" font-style="italic">c/o fatigue, pallor</text>
+  <text x="52" y="250" font-family="Georgia, serif" font-size="18" fill="#2a2a4a">Imp: Suspected iron deficiency anaemia</text>
+  <text x="52" y="310" font-family="Georgia, serif" font-size="22" fill="#1a1a3a">1. Hb% TC DC ESR</text>
+  <text x="72" y="348" font-family="Georgia, serif" font-size="16" fill="#c83030">(urgent)</text>
+  <text x="52" y="400" font-family="Georgia, serif" font-size="22" fill="#1a1a3a">2. Serum ferritin</text>
+  <text x="52" y="452" font-family="Georgia, serif" font-size="22" fill="#1a1a3a">3. TSH</text>
+  <text x="52" y="520" font-family="Georgia, serif" font-size="18" fill="#2a2a4a">Tab. Ferrous ascorbate 100mg OD × 30d</text>
+  <text x="400" y="780" font-family="Georgia, serif" font-size="18" fill="#4a4a68" font-style="italic"> Dr. A. Sen</text>
+</svg>

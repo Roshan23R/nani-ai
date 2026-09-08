@@ -23,13 +23,18 @@ export default function PrescriptionCard({ prescription }: { prescription: Presc
             Diagnosis
           </p>
           <p style={{ fontSize: 15, fontWeight: 600, color: NAVY, margin: 0 }}>{prescription.diagnosis}</p>
+          {prescription.complaint ? (
+            <p style={{ fontSize: 13, color: MUTED, margin: '6px 0 0' }}>{prescription.complaint}</p>
+          ) : null}
         </div>
         <div>
           <p style={{ fontFamily: monoFont, fontSize: 9, letterSpacing: '0.12em', color: MUTED, textTransform: 'uppercase', margin: '0 0 4px' }}>
             Prescriber
           </p>
           <p style={{ fontSize: 15, color: NAVY, margin: 0 }}>{prescription.doctor}</p>
-          <p style={{ fontSize: 13, color: MUTED, margin: '4px 0 0' }}>{prescription.date}</p>
+          {prescription.patient ? (
+            <p style={{ fontSize: 13, color: MUTED, margin: '4px 0 0' }}>Patient: {prescription.patient}</p>
+          ) : null}
         </div>
       </div>
       {prescription.medicines.length > 0 && (

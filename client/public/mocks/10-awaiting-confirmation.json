@@ -1,0 +1,99 @@
+{
+  "episode_id": "ep_7f3a9c",
+  "patient_id": "demo-patient-01",
+  "created_at": "2026-08-20T09:14:00Z",
+  "updated_at": "2026-08-20T09:15:20Z",
+  "error": null,
+  "state": "AWAITING_CONFIRMATION",
+  "summary_line": "Confirm what we read",
+  "prescription": {
+    "doctor": "Dr. A. Sen",
+    "date": "2014-03-14",
+    "diagnosis": "Suspected iron deficiency anaemia",
+    "complaint": "Fatigue and pallor",
+    "patient": "Meera Banerjee",
+    "medicines": [
+      {
+        "name": "Ferrous ascorbate",
+        "dose": "100mg",
+        "frequency": "once daily"
+      }
+    ],
+    "tests": [
+      {
+        "test_code": "CBC",
+        "display_name": "Hb% TC DC ESR",
+        "urgency": "urgent"
+      },
+      {
+        "test_code": "FERRITIN",
+        "display_name": "Serum ferritin",
+        "urgency": "routine"
+      },
+      {
+        "test_code": "TSH",
+        "display_name": "Thyroid stimulating hormone",
+        "urgency": "routine"
+      },
+      {
+        "test_code": "VITD",
+        "display_name": "25 OH D",
+        "urgency": "routine"
+      }
+    ],
+    "source_file_url": "/mocks/rx-sample.svg"
+  },
+  "confirmation": {
+    "required": true,
+    "confirmed_at": null,
+    "extracted_tests": [
+      {
+        "test_code": "CBC",
+        "display_name": "Hb% TC DC ESR",
+        "urgency": "urgent"
+      },
+      {
+        "test_code": "FERRITIN",
+        "display_name": "Serum ferritin",
+        "urgency": "routine"
+      },
+      {
+        "test_code": "TSH",
+        "display_name": "Thyroid stimulating hormone",
+        "urgency": "routine"
+      },
+      {
+        "test_code": "VITD",
+        "display_name": "25 OH D",
+        "urgency": "routine"
+      }
+    ],
+    "confirmed_tests": null,
+    "edits_made": null
+  },
+  "labs": [],
+  "bookings": [],
+  "report": null,
+  "analysis": null,
+  "consultation": null,
+  "timeline": [
+    {
+      "at": "2026-08-20T09:14:00Z",
+      "actor": "patient",
+      "action": "uploaded_prescription",
+      "detail": "rx1.jpg"
+    },
+    {
+      "at": "2026-08-20T09:15:00Z",
+      "actor": "intake_agent",
+      "action": "extracted_tests",
+      "detail": "4 tests found, confidence medium"
+    },
+    {
+      "at": "2026-08-20T09:15:20Z",
+      "actor": "intake_agent",
+      "action": "awaiting_confirmation",
+      "detail": "4 tests read from prescription — asked patient to confirm"
+    }
+  ]
+}

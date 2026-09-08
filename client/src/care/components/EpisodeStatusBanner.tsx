@@ -21,6 +21,7 @@ import { MUTED, NAVY, monoFont, sansFont } from '../ui'
 const STATE_ICON: Partial<Record<EpisodeState, typeof Loader2>> = {
   PRESCRIPTION_RECEIVED: Loader2,
   TESTS_IDENTIFIED: Stethoscope,
+  AWAITING_CONFIRMATION: UserRound,
   LABS_SHORTLISTED: FlaskConical,
   BOOKING_REQUESTED: Clock,
   AWAITING_REPORT: Hourglass,

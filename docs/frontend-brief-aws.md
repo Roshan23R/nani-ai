@@ -1,117 +1,178 @@
-# Frontend brief — Neeraj (AWS rebuild)
+# Frontend brief — Rakesh (AWS rebuild)
 
 **Hackathon:** Agents for Humans (AWS) · Everyday Agents track
-**Deadline:** Sep 14, 5:00pm PDT (5:30am IST Sep 15) — **11 days**
-**Your scope:** `client/` in the new repo, plus deploying it
+**Deadline:** Sep 14, 5:00pm PDT (5:30am IST Sep 15) — **6 days**
+**Your scope:** `client/`, plus deploying it
+
+> **Handover, Sep 8.** Neeraj is unavailable; Rakesh picks up the UI. This brief was
+> rewritten for the time actually remaining. The old Sep 3–14 timeline is gone — we are
+> six days out, not eleven, and the backend is roughly four days behind its own plan.
+>
+> Rakesh is now also carrying the three blog posts and the architecture diagram.
+> **That is too much for one person. Raise it at the next sync** — the blog posts are
+> 0.6 of a 5.6-point scale and must not silently drop.
 
 ---
 
-## 1. The headline: your work mostly carries over
+## 0. START HERE — the one thing that does not exist yet
 
-The backend is being rebuilt on AWS (Strands Agents, Bedrock, DynamoDB, S3, EventBridge). **The API surface is deliberately unchanged.** Same endpoints, same Episode object, same 12 states, same enums, same error shapes.
-
-Your required change is one line:
+**`AWAITING_CONFIRMATION` has never been built.** Not in this repo, not in the Google
+build, not on any branch. Verified on Sep 8:
 
 ```
-NEXT_PUBLIC_API_BASE_URL=<new AWS endpoint>
+git log --all -S 'AWAITING_CONFIRMATION'   →  one hit: the commit that added it to the contract
 ```
 
-Because `output: 'export'` bakes env vars in at build time, that needs a rebuild and redeploy — not a runtime config change.
+`client/src/care/types.ts` declares 12 states and does not include it. The frozen v1
+contract — the one from the Google hackathon — lists the same 12. The state was invented
+on **Sep 7**, after extraction testing showed the model misreads dates and vitals, so
+there is nothing to carry over.
 
-So your 11 days are mostly **not** rebuilding. They're for the four things below.
+Every `confirm` string you will find in `client/src/` lives in `src/renderer/`, the legacy
+simulation UI. `ConfirmModal.tsx` there is a generic dialog in a different design system.
+It is **not** reusable for this — see §2.3 for what the screen actually needs.
+
+**This is your first and highest-priority piece of work.**
+
+---
+
+## 1. The headline: everything else carries over
+
+The backend is being rebuilt on AWS (Strands Agents, Bedrock, DynamoDB, S3, EventBridge).
+**The API surface is deliberately unchanged.** Same endpoints, same Episode object, same
+enums, same error shapes. The one addition is the confirmation step.
+
+Your required config change is one line:
+
+```
+NEXT_PUBLIC_API_BASE_URL=<AWS endpoint>
+```
+
+Because `output: 'export'` bakes env vars in at build time, that needs a **rebuild and
+redeploy** — not a runtime config change. Do not discover this on Sep 13.
+
+Keep `NEXT_PUBLIC_USE_MOCKS=true` until the backend is live. Mock mode is your demo-day
+safety net; do not break it.
 
 ---
 
 ## 2. What you actually need to do
 
-### 2.1 Set up the new repo (Sep 3)
-Copy `client/` into the new repo. Deploy something — even a blank page — on day one. Confirm the pipeline works before you need it.
+### 2.1 Get it running and verify the mocks (Sep 8)
 
-### 2.2 Design polish — this is now worth real marks
+`client/` stays in this repo — the "copy to a fresh repo" plan from Sep 3 is **cancelled**,
+it costs a day and buys nothing a judge can see. Run the app against
+`client/public/mocks/01`–`09` and confirm every state still renders.
 
-Last hackathon, Design wasn't a named criterion. **Here it is one of five equally weighted criteria:** does the project deliver a complete, coherent product experience and not just a technical proof of concept?
+### 2.2 Build the confirmation step — NEW, core scope, do it first
 
-That means polish is no longer optional garnish. Specific things worth your time:
+Full spec in `api-contract-v2.md` §4. Three parts:
+
+**a. Teach the app the state.** Add `AWAITING_CONFIRMATION` to the `EpisodeState` union in
+`client/src/care/types.ts`, and to `STATE_LABELS`, `STATE_SHORT_LABELS`, `STATE_HINTS` and
+`TERMINAL_STATES` in `client/src/care/stateLabels.ts`. UI label: **"Confirm what we read"**.
+
+It is **terminal until acted on** — polling must stop. Nothing happens until the patient
+responds. A poller that keeps spinning here is a bug.
+
+**b. Add a mock.** `client/public/mocks/10-awaiting-confirmation.json`, following the shape
+of `02-tests-identified.json` plus the `confirmation` object from contract §4.3.
+
+**c. Build the screen:**
+
+- The extracted test list, each row **editable and removable**
+- **The prescription image alongside it** — without this the confirmation is meaningless,
+  because the patient has nothing to check against. This is not optional.
+- An urgency toggle per test (urgent / routine)
+- Primary action: **"Confirm and find labs"**
+- Secondary: **"I need to re-upload"** → back to upload
+
+Send the **full** list back with `keep` flags, not just the kept ones — the backend records
+what the patient rejected.
+
+**Two fields the API returns that you must NOT display:** `date` and `exam_findings`. The
+model misreads DD.MM.YY dates (a real 17.03.17 came back as 2014-03-14, and this reproduced
+again on Sep 8) and misreads vitals. They are stored for completeness. Showing a wrong blood
+pressure in a health app is worse than showing nothing.
+
+`medicines`, `complaint`, `diagnosis` and `patient` may be shown read-only as context. They
+are not editable and drive nothing.
+
+> **Note on `confirmation.required`.** Decided Sep 8: it is **false when extraction
+> confidence is `high`** — the agent books those without asking. `medium` routes to
+> `AWAITING_CONFIRMATION`; `low` or no tests goes to `NEEDS_HUMAN`.
+>
+> **This does not change your work,** but it does mean not every episode passes through
+> your screen. Build it to render whenever the episode is in `AWAITING_CONFIRMATION`, and
+> do not assume it always will be.
+
+**Make this screen good.** Design is one of five equally weighted criteria and asks whether
+this is a complete product or a technical proof of concept. An agent that says "here's what
+I read, confirm before I book" is the most defensible thing in the whole product.
+
+### 2.3 Design polish — worth real marks
+
+Last hackathon Design wasn't a named criterion. **Here it is one of five equally weighted
+criteria.**
 
 - **Empty and loading states everywhere.** A blank panel reads as broken.
-- **The timeline** — still the hero element. Make agent actions visually distinct from patient actions. If a judge only looks at one screen, this is it.
-- **The results table and sparklines.** A falling line is instantly legible; make sure it reads at video resolution.
-- **`NEEDS_HUMAN`** — a graceful, clearly-worded failure state with a working retry. Judges look for this.
-- **Consistency pass.** Same spacing, same type scale, same button styles throughout. Incoherence is what separates "product" from "proof of concept."
+- **The timeline** — still the hero element. Make agent actions visually distinct from
+  patient actions. If a judge looks at one screen, it's this one.
+- **The results table and sparklines.** A falling line is instantly legible; make sure it
+  reads at video resolution.
+- **`NEEDS_HUMAN`** — a graceful, clearly-worded failure state with a working retry.
+  This path is live today: the dental prescription (`IMG_2071`) extracts zero tests and
+  gates straight to `NEEDS_HUMAN`, so you can test it for real.
+- **Consistency pass.** Same spacing, type scale and button styles throughout.
 
-### 2.3 Build the confirmation screen — NEW, core scope
+### 2.4 Delete the legacy MedLifeSim UI
 
-This is the one genuinely new screen. Full spec in `api-contract-v2.md` section 4.
+`client/src/renderer/` holds the old simulation UI with a `react-router-dom` shim. **Delete
+it.** Judges clone and read this repo; dead code that isn't part of the product weakens the
+"coherent product experience" score, and the shim breaks for anyone running it fresh. Put it
+on a branch if you want it preserved.
 
-**Why it exists:** we tested prescription extraction against three real handwritten prescriptions. The model reads the *test list* reliably — 4 of 4 on a hard one — but misreads dates and vitals, and asserts them confidently. So the agent must not book anything until the patient has confirmed what it read.
+### 2.5 Live demo link
 
-**New state:** `AWAITING_CONFIRMATION`, sitting between `TESTS_IDENTIFIED` and `LABS_SHORTLISTED`. It's terminal until acted on — stop polling, nothing happens until the patient responds.
-
-**The screen needs:**
-- The extracted test list, each row **editable and removable**
-- **The prescription image alongside it** — without this the confirmation is meaningless, since the patient has nothing to check against
-- An urgency toggle per test
-- Primary action: "Confirm and find labs"
-- Secondary: "I need to re-upload"
-
-**Two fields the API returns that you must NOT display:** `date` and `exam_findings`. The model misreads DD.MM.YY dates (a real 17.03.17 came back as 2014-03-14) and misreads vitals (a real BP of 140/80 came back as PR 110/80). They're stored for completeness but showing a wrong blood pressure in a health app is worse than showing nothing.
-
-**Make this screen good.** Design is one of five equally weighted criteria here, and it asks whether this is a complete product or a technical proof of concept. An agent that says "here's what I read, confirm before I book" is the most defensible thing in the whole product.
-
-### 2.4 The legacy MedLifeSim UI — decide and act
-
-`src/renderer/` holds the old simulation UI, kept for internal use, with a `react-router-dom` shim.
-
-**Recommendation: delete it from the new repo.** Reasons:
-- Judges will clone and read this repo. Dead code that isn't part of the product reads as clutter and weakens the "coherent product experience" score.
-- The shim is a source of confusing breakage for anyone running it fresh.
-- It's not part of the submission.
-
-Keep it in the old repo where it belongs. If you want it preserved, put it on a branch.
-
-### 2.5 Live demo link — matters for scoring
-
-The rules say projects with a live demo score higher on Technical Implementation. You already produce a static export, so this is nearly free.
-
-**Firebase Hosting is fine** — it's just static files, and nothing in the rules requires the frontend on AWS. If you have spare time late on, S3 + CloudFront is a slightly better story for an AWS hackathon, but do not spend build days on it. Working beats on-brand.
+Projects with a live demo score higher on Technical Implementation, and you already produce
+a static export. **Firebase Hosting is fine** — nothing requires the frontend on AWS, and
+the S3 + CloudFront move is **cut**. Working beats on-brand.
 
 ---
 
-## 3. Coverage feature — DO NOT BUILD YET
+## 3. Coverage feature — CUT, do not build
 
-There's an optional insurance-coverage extension specced in `api-contract-v2.md` section 4. It is a **stretch goal on Shashank's side**, gated on the core cascade working end to end on AWS by Sep 10.
-
-**Wait for Shashank to confirm it's shipping before you build any UI for it.** If it doesn't get built, the `coverage` field simply never appears and nothing breaks.
-
-If it is confirmed, the display rules that matter are in `api-contract-v2.md` section 5. The one to internalise: **always show the clause reference next to the verdict.** "Clause 4.2" is what proves the agent read the document rather than guessing. It's the most important visual detail in the whole feature.
+The insurance-coverage extension in `api-contract-v2.md` §5 is **cancelled**, not deferred.
+Its own gate required the core cascade running end to end by Sep 10, and it will not be.
+The `coverage` field simply never appears and nothing breaks.
 
 ---
 
-## 4. Video needs — plan for this
+## 4. Video needs
 
-The video is max 5 minutes and Presentation is a full criterion. Two things from you:
+Max 5 minutes, and Presentation is a full criterion.
 
-- **The app must survive a continuous live run.** No refreshes, no manual nudges, no "let me just reload that." Test the full flow start to finish before Sep 13.
-- **Readable at video resolution.** Check the timeline and the results table at the size they'll be recorded. If it needs scrolling or squinting, it fails on video.
+- **The app must survive a continuous live run.** No refreshes, no manual nudges. Test the
+  full flow start to finish before Sep 13.
+- **Readable at video resolution.** Check the timeline and results table at recording size.
+  If it needs squinting, it fails on video.
 
 ---
 
-## 5. Timeline
+## 5. Timeline — rewritten Sep 8
 
 | Date | What |
 |---|---|
-| Sep 3 | New repo, `client/` copied, blank deploy working |
-| Sep 4 | Verify mocks all still render; delete `src/renderer/` |
-| Sep 5 | Polish pass: loading and empty states |
-| Sep 6 | Polish pass: timeline, results table, consistency |
-| Sep 7 | `NEEDS_HUMAN` state and retry flow |
-| Sep 8 | Repoint to live AWS API, rebuild, redeploy |
-| Sep 9 | Deploy final frontend |
-| Sep 10 | Fix integration breaks with Shashank |
-| Sep 11 | Coverage UI **only if confirmed**; otherwise buffer |
-| Sep 12 | Full end-to-end rehearsal at video resolution |
-| Sep 13 | **Recording day.** Help Shashank. No new features. |
-| Sep 14 | Buffer only |
+| **Sep 8** | Get `client/` running, verify mocks 01–09, delete `src/renderer/` |
+| **Sep 9** | `AWAITING_CONFIRMATION`: types, labels, mock 10 |
+| **Sep 10** | Confirmation screen built against mock 10 |
+| **Sep 11** | Point at Shashank's live API, rebuild, redeploy |
+| **Sep 12** | Integration fixes · `NEEDS_HUMAN` retry · loading and empty states · rehearse at video resolution |
+| **Sep 13** | **Recording day.** No new features. |
+| **Sep 14** | Buffer only |
+
+Blog posts and the architecture diagram run alongside this. If something has to give,
+**say so at the sync** — do not quietly drop the posts.
 
 ---
 
@@ -121,6 +182,7 @@ The video is max 5 minutes and Presentation is a full criterion. Two things from
 - [ ] All 13 states render without crashing (12 + `AWAITING_CONFIRMATION`)
 - [ ] Nulls handled — early states are mostly null
 - [ ] Confirmation screen: editable tests, prescription image alongside, working confirm
+- [ ] Polling stops in `AWAITING_CONFIRMATION`
 - [ ] `date` and `exam_findings` NOT displayed anywhere
 - [ ] Timeline distinguishes agent from patient actions
 - [ ] Results table shows values, ranges, flags, trends
@@ -128,7 +190,7 @@ The video is max 5 minutes and Presentation is a full criterion. Two things from
 - [ ] `NEEDS_HUMAN` renders with working retry
 - [ ] Loading and empty states everywhere
 - [ ] `src/renderer/` removed
-- [ ] Mock mode still works with no backend (your demo-day safety net)
+- [ ] Mock mode still works with no backend
 - [ ] Readable at video resolution
 - [ ] Survives a full continuous run without intervention
 
@@ -141,4 +203,5 @@ The video is max 5 minutes and Presentation is a full criterion. Two things from
 2. What is blocked
 3. Does the end-to-end path still work
 
-Raise any API contract mismatch at the sync — don't work around it silently. A mismatch found on Sep 12 costs both of you a day.
+Raise any API contract mismatch at the sync — don't work around it silently. A mismatch
+found on Sep 12 costs both of you a day.

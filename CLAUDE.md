@@ -51,6 +51,22 @@ a state machine you can bypass is a diagram, not a safety property.
 - **Exam findings are not medicines.** SLR, OLE, ROM, BP, PR, SpO2, rhonchi, "no neurology" — these get misfiled into `medicines` unless the prompt calls them out explicitly.
 - **Gate:** `confidence == "low"` or empty `tests` → `NEEDS_HUMAN`. Never proceed on a weak extraction. This gate caught Haiku fabricating an entire coherent cardiac case (aspirin, statin, beta blocker, lipid profile, ECG) from an illegible prescription about back pain.
 
+- **Image encoding changes extraction accuracy — measured Sep 9 on `IMG_2070.HEIC`.**
+  - `3000px` long edge, **baseline** JPEG → `CBC: "Hb/TC/DC/ESR"` correct
+  - `3000px` long edge, **progressive** JPEG → `CBC: "Hb% RBC ESR"` misread
+  - `2000px` long edge, either → misread
+
+  So: **never write progressive JPEGs**, and do not shrink below ~2600px. A full
+  4284px baseline encode exceeds Bedrock's 5 MB image cap, which is what pushed the
+  first version into progressive compression and quietly cost accuracy. Settings live
+  in `backend/tools/images.py`.
+- **HEIC is converted, not rejected.** iPhones shoot HEIC by default, so it is the most
+  likely real upload. `tools/images.py` converts HEIC/HEIF/BMP/TIFF to JPEG and applies
+  EXIF rotation before anything reaches Bedrock.
+- **A high-resolution scan can surface new false positives.** The HEIC of `IMG_2070`
+  renders "P.T.O" (please turn over) legibly enough that the model has emitted it as a
+  test. The confirmation step is what catches this — it is the case that step exists for.
+
 **The working prompt lives in `backend/scripts/test_extraction.py`. Reuse it verbatim in the intake agent.** It is the product of four tuning rounds against real documents.
 
 ## Stack

@@ -6,9 +6,10 @@ Strategy and reasoning live in `aws-build-plan.md`. This file is only *what to d
 One rule: **do not skip ahead.** The order encodes dependencies, and the spine (Phase 1)
 blocks everything after it.
 
-> ### ▶ NEXT UP — step 20, the confirmation screen (Rakesh)
-> The backend cascade runs end to end on AWS, unattended. What is left is the
-> frontend, the video, and the console tasks only you can do — steps 01, 03, 22, 23, 28–30.
+> ### ▶ NEXT UP — step 22, build and deploy the frontend
+> The confirmation screen exists and the backend is live. Nothing has ever been
+> built or deployed from `client/` in this repo: no `out/`, no `.firebaserc`.
+> The live site is still the Google-era build calling Cloud Run.
 
 ---
 
@@ -42,7 +43,7 @@ step on the timeline.** Nothing here calls a third-party API. This is the week's
 ## Phase 2 · API and the first real render — Sep 9
 
 - [x] **10** `backend/api/main.py` — 8 endpoints, diffed field-by-field against the frozen mocks
-- [ ] **11** Point the client at localhost — `NEXT_PUBLIC_USE_MOCKS=false`. The 21 components in `client/src/care/` already render every state; this is where wrong fields surface
+- [x] **11** Client wired to the live API — `api.ts` calls all endpoints and tolerates both the old bare-array and new wrapped collection shapes
 
 ---
 
@@ -62,7 +63,7 @@ step on the timeline.** Nothing here calls a third-party API. This is the week's
 
 - [x] **19** `AWAITING_CONFIRMATION` + `/confirm` + the `confirmation` object
 - [x] **19b** **Decided Sep 8: yes.** `high` books autonomously, `medium` confirms, `low`/no tests escalates. CLAUDE.md rule 3 rewritten to match; logic in `state/machine.py:route_after_extraction`
-- [ ] **20** Frontend (Rakesh): state in `types.ts` + `stateLabels.ts`, mock `10-awaiting-confirmation.json`, then the screen — editable removable rows, urgency toggle, **prescription image alongside**. Never render `date` or `exam_findings`. See `frontend-brief-aws.md` §0 and §2.2
+- [x] **20** Frontend confirmation step — landed in `a76e18a` (Neeraj): `AWAITING_CONFIRMATION` in types + stateLabels, mock 10, `ConfirmationPanel.tsx`, `confirmEpisode()`
 
 ---
 

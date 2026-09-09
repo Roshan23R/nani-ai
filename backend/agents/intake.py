@@ -22,6 +22,7 @@ from strands import Agent
 from strands.types.content import ContentBlock
 
 from agents.prompts import SYSTEM_PROMPT, USER_PROMPT
+from tools import images
 from agents.strands_setup import (
     JSONParseError,
     MODEL_SMART,
@@ -84,10 +85,15 @@ def build_content_block(path: str) -> ContentBlock:
         fmt = "jpeg" if ext == "jpg" else ext
         return {"image": {"format": fmt, "source": {"bytes": raw}}}
 
+    # HEIC is what an iPhone produces by default, so this is the single most
+    # likely upload in the product. Convert rather than refuse.
+    if images.needs_conversion(path):
+        return {"image": {"format": "jpeg", "source": {"bytes": images.to_jpeg(raw, path)}}}
+
     raise ValueError(
-        f"Unsupported file type '{ext or path}'. Images: {sorted(IMAGE_FORMATS)}. "
-        f"Documents: {sorted(DOC_FORMATS)}. "
-        "(HEIC is not accepted by Bedrock — convert it first.)"
+        f"Unsupported file type '{ext or path}'. "
+        f"Images: {sorted(IMAGE_FORMATS | images.CONVERTIBLE)}. "
+        f"Documents: {sorted(DOC_FORMATS)}."
     )
 
 

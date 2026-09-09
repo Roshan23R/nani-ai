@@ -27,6 +27,8 @@ opentelemetry-instrumentation-threading==0.65b0
 opentelemetry-sdk==1.44.0
 opentelemetry-semantic-conventions==0.65b0
 packaging==26.3
+pillow==12.2.0
+pillow_heif==1.0.0
 pluggy==1.6.0
 pycparser==3.0
 pydantic==2.13.5

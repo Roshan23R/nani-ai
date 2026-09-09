@@ -45,8 +45,23 @@ coordinator = Coordinator()
 # --- helpers ---------------------------------------------------------------
 
 def public(episode: dict) -> dict:
-    """Strip internal bookkeeping. Underscore keys never cross the wire."""
-    return {k: v for k, v in episode.items() if not k.startswith("_")}
+    """Strip internal bookkeeping and make stored s3:// URIs browsable.
+
+    DynamoDB holds the durable `s3://bucket/key`. A browser cannot open that —
+    an <img src> silently falls back to a placeholder and a link opens a blank
+    tab — so it is swapped for a presigned https URL on the way out, every
+    time, rather than persisted in a form that expires.
+    """
+    from tools import s3
+
+    out = {k: v for k, v in episode.items() if not k.startswith("_")}
+    for section in ("prescription", "report"):
+        block = out.get(section)
+        if isinstance(block, dict) and block.get("source_file_url"):
+            block = dict(block)
+            block["source_file_url"] = s3.presign(block["source_file_url"])
+            out[section] = block
+    return out
 
 
 def fail(status: int, code: str, message: str, retryable: bool = False):

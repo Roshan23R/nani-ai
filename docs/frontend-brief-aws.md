@@ -125,6 +125,63 @@ criteria.**
   gates straight to `NEEDS_HUMAN`, so you can test it for real.
 - **Consistency pass.** Same spacing, type scale and button styles throughout.
 
+### 2.6 Error panel: warning vs error styling — NEW, Sep 9
+
+`ErrorPanel.tsx` is hardcoded red everywhere. That is wrong for one common case:
+a prescription we read perfectly well that simply orders no tests. It stops the
+episode, so it lands in `NEEDS_HUMAN` and renders here — but it is a normal
+outcome, and alarm red makes a working agent look broken.
+
+The backend now says which it is. `error.severity` is `"warning"` or `"error"`.
+**Treat a missing value as `"error"`** — older episodes in DynamoDB predate the field.
+
+| code | severity | when |
+|---|---|---|
+| `NO_TESTS_FOUND` | `warning` | Read fine, no investigations on the page |
+| `PRESCRIPTION_UNREADABLE` | `error` | Handwriting illegible, or the file could not be opened |
+| `REPORT_UNREADABLE`, `NO_LABS_FOUND`, `EXTRACTION_FAILED` | `error` | Genuine failures |
+
+**File: `client/src/care/components/ErrorPanel.tsx`.** Five hardcoded values to
+make severity-dependent:
+
+| line | now | warning should be |
+|---|---|---|
+| 24 | `border: '1px solid #f0c8c8'` | amber border, e.g. `#f0dcb4` |
+| 25 | `background: 'linear-gradient(165deg, #fffafa 0%, #fff 55%)'` | warm tint, e.g. `#fffdf7` |
+| 36 | icon chip `background: '#fdeaea'` | `#fdf4e3` |
+| 37 | icon chip `border: '1px solid #f0c0c0'` | `#f0dcb4` |
+| 40 | icon `color: '#c83030'` | `#b5761a` |
+| 78 | `<MonoButton variant="danger">` | the neutral/primary variant |
+
+`AlertTriangle` (line 44) is right for both — keep it.
+
+**Also: `client/src/care/types.ts`.**
+
+```ts
+export type ErrorCode =
+  | 'PRESCRIPTION_UNREADABLE'
+  | 'NO_TESTS_FOUND'      // add
+  // ...existing codes
+
+export interface EpisodeError {
+  code: ErrorCode | string
+  message: string
+  action_hint: string
+  retryable: boolean
+  severity?: 'warning' | 'error'   // add; absent means 'error'
+}
+```
+
+**Copy also changed.** The backend no longer puts exception text in `message` —
+"Something went wrong while processing this episode: Unsupported file type 'heic'…"
+is gone. Messages are now plain sentences a patient can act on, so the panel can
+show `message` as the headline without pre-processing it.
+
+**Worth testing:** upload `IMG_2071.jpg` (a dental prescription, no
+investigations) against the live API. That is the `warning` path end to end.
+
+---
+
 ### 2.4 Delete the legacy MedLifeSim UI
 
 `client/src/renderer/` holds the old simulation UI with a `react-router-dom` shim. **Delete

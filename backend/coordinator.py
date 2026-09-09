@@ -149,13 +149,29 @@ class Coordinator:
             return episode
         try:
             episode = handler(self, episode, file_bytes)
-        except Exception as exc:  # noqa: BLE001 — any failure escalates, never crashes
+        except ValueError as exc:
+            # Bad input rather than a broken system — the file type we cannot
+            # read, most often. Say what to do about it, in plain words.
+            log.warning("unusable input in %s: %s", episode["state"], exc)
+            return self._escalate(
+                episode,
+                code="PRESCRIPTION_UNREADABLE",
+                message="We couldn't open that file.",
+                action_hint=(
+                    "Photos (JPEG, PNG, HEIC) and PDFs work best. "
+                    "Try taking a photo of the prescription instead."
+                ),
+                retry_to=State.PRESCRIPTION_RECEIVED,
+            )
+        except Exception:  # noqa: BLE001 — any failure escalates, never crashes
+            # The stack trace goes to CloudWatch, not to the patient. Raw
+            # exception text in a health app reads as a crash and helps nobody.
             log.exception("step failed in %s", episode["state"])
             return self._escalate(
                 episode,
                 code="EXTRACTION_FAILED",
-                message=f"Something went wrong while processing this episode: {exc}",
-                action_hint="Try again, or upload the document once more.",
+                message="Something went wrong on our side while processing this.",
+                action_hint="Try again in a moment — your upload is saved.",
             )
         store.put_episode(episode)
         return episode
@@ -236,13 +252,14 @@ class Coordinator:
                 )
             return self._escalate(
                 episode,
-                code="EXTRACTION_FAILED",
-                message="No diagnostic tests were found on this prescription.",
+                code="NO_TESTS_FOUND",
+                message="We read this prescription, but it doesn't order any tests.",
                 action_hint=(
-                    "If your doctor did order tests, upload a clearer photo — "
-                    "otherwise there is nothing to book."
+                    "Nothing to book from this one. If your doctor did order tests, "
+                    "upload a clearer photo and we'll take another look."
                 ),
                 retry_to=State.PRESCRIPTION_RECEIVED,
+                severity="warning",
             )
         return episode
 
@@ -253,10 +270,11 @@ class Coordinator:
         if not (episode.get("prescription") or {}).get("tests"):
             return self._escalate(
                 episode,
-                code="EXTRACTION_FAILED",
-                message="This episode has no extracted tests to act on.",
-                action_hint="Upload the prescription again.",
+                code="NO_TESTS_FOUND",
+                message="We don't have any tests recorded for this prescription.",
+                action_hint="Upload the prescription again and we'll re-read it.",
                 retry_to=State.PRESCRIPTION_RECEIVED,
+                severity="warning",
             )
         confidence = (episode.get("_extraction") or {}).get("confidence")
         target = route_after_extraction(needs_human=False, confidence=confidence)
@@ -495,6 +513,7 @@ class Coordinator:
         message: str,
         action_hint: str,
         retry_to: State | str | None = None,
+        severity: str = "error",
     ) -> dict:
         """Escalate to NEEDS_HUMAN, recording where a retry should resume.
 
@@ -504,7 +523,7 @@ class Coordinator:
         patient can supply a better photo.
         """
         episode["_retry_from"] = str(retry_to or episode["state"])
-        store.set_error(episode, code, message, action_hint, retryable=True)
+        store.set_error(episode, code, message, action_hint, retryable=True, severity=severity)
         store.apply_transition(
             episode,
             State.NEEDS_HUMAN,

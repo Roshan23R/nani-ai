@@ -309,3 +309,9 @@ If it gets built, the display rules that matter:
   - `GET /api/episodes` → `{"episodes": [...]}` (was `[...]`)
   - `client/src/care/api.ts` accepts either shape, so nothing broke. New: `GET/PUT/PATCH /api/patients/{id}` for the care profile.
   - **The mock files in `client/public/mocks/` are per-episode and unaffected**, but any other consumer written against the v1 list shape is not.
+- `2026-09-09` — **`error.severity` added, and `NO_TESTS_FOUND` split out of `EXTRACTION_FAILED`.**
+  - `error` gains `severity: "warning" | "error"`. Optional and additive; treat a missing value as `"error"`.
+  - New code `NO_TESTS_FOUND` (`severity: "warning"`), for a prescription that was read fine but orders no investigations. It is a normal outcome, not a fault, and painting it red made a working agent look broken.
+  - `EXTRACTION_FAILED` had been carrying three unrelated situations. It now means only "something broke on our side".
+  - Patient-facing `message` no longer contains exception text. Stack traces go to CloudWatch.
+  - **UI action required** — see `frontend-brief-aws.md` §2.6.

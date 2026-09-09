@@ -127,14 +127,25 @@ def apply_transition(
 
 
 def set_error(
-    episode: dict, code: str, message: str, action_hint: str = "", retryable: bool = True
+    episode: dict,
+    code: str,
+    message: str,
+    action_hint: str = "",
+    retryable: bool = True,
+    severity: str = "error",
 ) -> dict:
-    """Populate the contract's error object. Only meaningful in NEEDS_HUMAN."""
+    """Populate the contract's error object. Only meaningful in NEEDS_HUMAN.
+
+    `severity` drives how the UI paints the panel. Not everything that stops an
+    episode is a fault: a prescription that simply orders no tests is a normal
+    outcome the patient should see in warning yellow, not alarm red.
+    """
     episode["error"] = {
         "code": code,
         "message": message,
         "action_hint": action_hint,
         "retryable": retryable,
+        "severity": severity,
     }
     return episode
 

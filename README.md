@@ -145,6 +145,120 @@ a rebuild and redeploy — it is not a runtime config change.
 
 ---
 
+## Testing
+
+### Backend unit tests
+
+```bash
+cd backend
+python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
+./venv/bin/python -m pytest tests/ -q
+```
+
+Covers the deterministic state machine, coordinator routing (including confirmation
+confidence gates), and prompt parity.
+
+### Backend smoke scripts
+
+Requires AWS credentials (`aws configure`). Optional Google keys live in `backend/.env`
+(see `.env.example`).
+
+```bash
+cd backend
+
+# Bedrock reachable via Strands
+./venv/bin/python scripts/hello_strands.py
+
+# Intake only (real Bedrock call — costs credits)
+./venv/bin/python scripts/run_intake.py ../demo-data/rx.jpg
+
+# Full cascade with stubbed agents — no Bedrock / SES cost
+./venv/bin/python scripts/run_episode.py ../demo-data/rx.jpg --stub
+```
+
+- `--stub` swaps in canned agents (no model calls, no email).
+- `NANI_DRY_RUN=1` builds booking emails without handing them to SES.
+
+API liveness:
+
+```bash
+curl https://<api-base>/api/health
+# → {"ok": true, "service": "nani-ai"}
+```
+
+### Frontend — mock mode (no backend)
+
+Default for local UI work. No AWS required.
+
+```bash
+cd client
+npm install
+cp .env.example .env.local
+```
+
+Set in `.env.local`:
+
+```
+NEXT_PUBLIC_USE_MOCKS=true
+NEXT_PUBLIC_API_BASE_URL=
+```
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+**Manual checklist**
+
+- Landing → launch app → dashboard
+- Upload a prescription — mocks advance and pause at `AWAITING_CONFIRMATION`
+- Confirm / edit / remove tests, or **I need to re-upload**
+- Episode mock cycler (bottom-right when mocks are on) — step all states including
+  `NEEDS_HUMAN` and `CLOSED`
+- Report upload when awaiting report
+- Analytics and episodes list still render
+
+Mock payloads: `client/public/mocks/` (`01`–`10`).
+
+### Frontend — against the live API
+
+```
+NEXT_PUBLIC_USE_MOCKS=false
+NEXT_PUBLIC_API_BASE_URL=https://<your-api-gateway>
+NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID=<optional>
+```
+
+Restart `npm run dev`. For static export / Firebase Hosting, **rebuild** after any
+`NEXT_PUBLIC_*` change — values bake in at build time.
+
+**End-to-end checklist**
+
+1. `GET /api/health` returns ok
+2. Upload prescription → intake
+3. Medium confidence → confirmation screen → **Confirm and find labs**
+4. Labs shortlisted → booking requested (SES)
+5. Upload report (or wait for S3 inbox + EventBridge tick)
+6. Trends → anomaly **or** normal → consult / closed
+7. Unreadable / no-tests Rx → `NEEDS_HUMAN` → retry
+
+### Production build sanity
+
+```bash
+cd client
+npm run build   # static site → out/
+```
+
+| Layer | How |
+|---|---|
+| Automated backend | `pytest tests/` |
+| Stub cascade | `run_episode.py … --stub` |
+| UI only | `NEXT_PUBLIC_USE_MOCKS=true` |
+| UI + AWS | mocks off + live `NEXT_PUBLIC_API_BASE_URL` |
+| Liveness | `GET /api/health` |
+
+---
+
 ## Status
 
 The backend cascade runs end to end on AWS: upload → extract → confirm → labs → booking

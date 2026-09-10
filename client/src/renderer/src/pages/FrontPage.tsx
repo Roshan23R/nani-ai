@@ -22,16 +22,19 @@ const capabilities = [
     title: 'Stays across days',
     body: 'Not a chatbot you keep prompting — something that follows the arc of a single care episode with you.',
     image: NANI.remember,
+    alt: 'Nani thinking through a care episode over time',
   },
   {
     title: 'Labs without the scramble',
     body: 'Finding a lab, booking it, and tracking status — so the logistics don’t fall entirely on you.',
     image: NANI.followup,
+    alt: 'Nani checking lab booking status on a phone',
   },
   {
     title: 'Notices what changed',
     body: 'Remembers prior reports and flags the difference between “you’re fine” and “this is different from last time.”',
     image: NANI.notice,
+    alt: 'Nani pointing out a change in lab result trends',
   },
 ]
 
@@ -576,7 +579,7 @@ export default function FrontPage() {
 
       {/* Capabilities with portraits */}
       <section style={{ padding: `72px ${padX}`, borderBottom: '1px solid #e8e8f2' }}>
-        <SectionLabel>What NaniAi does</SectionLabel>
+        <SectionLabel>What Nani AI does</SectionLabel>
         <motion.h2
           variants={fadeUp}
           initial="hidden"
@@ -588,54 +591,90 @@ export default function FrontPage() {
             margin: '0 0 40px',
             letterSpacing: '-0.02em',
             maxWidth: 560,
+            color: NAVY,
+            lineHeight: 1.25,
           }}
         >
           From prescription to knowing what changed.
         </motion.h2>
         <div
+          className="nani-capabilities"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-            gap: 28,
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            gap: 32,
             maxWidth: 1080,
+            alignItems: 'start',
           }}
         >
-          {capabilities.map((c, i) => (
-            <motion.div
-              key={c.title}
-              initial={{ opacity: 0, y: 18 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.45, delay: i * 0.1, ease: easeOut }}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 16,
-              }}
-            >
-              <div
+          {capabilities.map((c, i) => {
+            const accent = i === 1 ? TEAL : BLUE
+            return (
+              <motion.div
+                key={c.title}
+                initial={{ opacity: 0, y: 18 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.45, delay: i * 0.1, ease: easeOut }}
                 style={{
-                  height: 160,
-                  borderRadius: 12,
-                  background: LIGHT_BLUE,
                   display: 'flex',
-                  alignItems: 'flex-end',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  borderBottom: `3px solid ${i === 1 ? TEAL : BLUE}`,
+                  flexDirection: 'column',
+                  gap: 16,
+                  minWidth: 0,
                 }}
               >
-                <img
-                  src={c.image}
-                  alt=""
-                  style={{ height: 148, width: 'auto', maxWidth: '90%', objectFit: 'contain' }}
-                />
-              </div>
-              <h3 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{c.title}</h3>
-              <p style={{ fontSize: 15, lineHeight: 1.65, color: '#4a4a78', margin: 0 }}>{c.body}</p>
-            </motion.div>
-          ))}
+                <div
+                  style={{
+                    aspectRatio: '4 / 3',
+                    borderRadius: 14,
+                    background: `linear-gradient(165deg, #f3f5ff 0%, ${LIGHT_BLUE} 100%)`,
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    borderBottom: `3px solid ${accent}`,
+                    padding: '16px 12px 0',
+                  }}
+                >
+                  <img
+                    src={c.image}
+                    alt={c.alt}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      maxHeight: '100%',
+                      objectFit: 'contain',
+                      objectPosition: 'bottom center',
+                      display: 'block',
+                    }}
+                  />
+                </div>
+                <h3
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 600,
+                    margin: 0,
+                    color: NAVY,
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  {c.title}
+                </h3>
+                <p style={{ fontSize: 15, lineHeight: 1.65, color: '#4a4a78', margin: 0 }}>
+                  {c.body}
+                </p>
+              </motion.div>
+            )
+          })}
         </div>
+        <style>{`
+          @media (max-width: 860px) {
+            .nani-capabilities {
+              grid-template-columns: 1fr !important;
+              max-width: 420px;
+            }
+          }
+        `}</style>
       </section>
 
       {/* Closing CTA band with follow-up Nani */}
